@@ -1,6 +1,6 @@
 import type { Usuario, Sala, Aula, Chamado } from "./types"
 
-export const usuarios: Usuario[] = [
+export const usuarios: Partial<Usuario>[] = [
   {
     id: "1",
     nome: "Prof. João Silva",
@@ -76,7 +76,7 @@ export const aulas: Aula[] = [
     professorId: "1",
     salaId: "1",
     sala: "Sala 101",
-    dataHora: "2024-12-02T08:00:00",
+    dataHora: "2024-12-02T08:00:00" as any,
     duracao: 120,
     status: "agendada",
   },
@@ -87,7 +87,7 @@ export const aulas: Aula[] = [
     professorId: "3",
     salaId: "3",
     sala: "Lab Informática",
-    dataHora: "2024-12-02T10:00:00",
+    dataHora: "2024-12-02T10:00:00" as any,
     duracao: 90,
     status: "agendada",
   },
@@ -98,7 +98,7 @@ export const aulas: Aula[] = [
     professorId: "1",
     salaId: "2",
     sala: "Sala 102",
-    dataHora: "2024-12-02T14:00:00",
+    dataHora: "2024-12-02T14:00:00" as any,
     duracao: 120,
     status: "em_andamento",
   },
@@ -116,7 +116,7 @@ export const chamados: Chamado[] = [
     sala: "Sala 101",
     solicitante: "Prof. João Silva",
     solicitanteId: "1",
-    dataAbertura: "2024-12-01T09:00:00",
+    dataAbertura: "2024-12-01T09:00:00" as any,
     responsavelId: "4",
     responsavel: "Carlos Oliveira",
   },
@@ -131,7 +131,7 @@ export const chamados: Chamado[] = [
     sala: "Auditório",
     solicitante: "Maria Santos",
     solicitanteId: "2",
-    dataAbertura: "2024-11-30T15:30:00",
+    dataAbertura: "2024-11-30T15:30:00" as any,
     responsavelId: "5",
     responsavel: "Fernanda Lima",
   },
@@ -146,8 +146,8 @@ export const chamados: Chamado[] = [
     sala: "Sala 102",
     solicitante: "Prof. Ana Costa",
     solicitanteId: "3",
-    dataAbertura: "2024-11-29T11:00:00",
-    dataResolucao: "2024-11-30T08:00:00",
+    dataAbertura: "2024-11-29T11:00:00" as any,
+    dataResolucao: "2024-11-30T08:00:00" as any,
     responsavelId: "4",
     responsavel: "Carlos Oliveira",
   },
@@ -162,6 +162,6 @@ export const chamados: Chamado[] = [
     sala: "Sala 101",
     solicitante: "Prof. João Silva",
     solicitanteId: "1",
-    dataAbertura: "2024-12-02T08:30:00",
+    dataAbertura: "2024-12-02T08:30:00" as any,
   },
 ]
