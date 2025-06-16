@@ -7,7 +7,7 @@ export interface ServiceResponse {
 }
 
 export interface Usuario {
-  id: string;
+  id?: string;
   nome: string;
   email: string;
   senha: string; // Em produção, deve ser armazenada de forma segura (hash)

@@ -142,7 +142,6 @@ export default function UsuariosPage() {
     } else {
       // Criar novo usuário
       const novoUsuario: Usuario = {
-        id: Date.now().toString(),
         nome: formData.nome,
         email: formData.email,
         senha: 'senha123', // Em um sistema real, a senha deve ser gerada e armazenada de forma segura
@@ -150,7 +149,7 @@ export default function UsuariosPage() {
         ativo: formData.ativo,
         departamento: formData.departamento,
         telefone: formData.telefone,
-        foto: '/placeholder.svg?height=128&width=128',
+        foto: 'https://www.shutterstock.com/pt/image-photo/selfie-influencer-girl-live-streaming-update-2489152413',
       };
       setUsuarios([...usuarios, novoUsuario]);
     }
@@ -159,7 +158,7 @@ export default function UsuariosPage() {
     resetForm();
   };
 
-  const alterarStatus = (id: string, ativo: boolean) => {
+  const alterarStatus = (id: string | undefined, ativo: boolean) => {
     setUsuarios(
       usuarios.map((u) =>
         u.id === id
@@ -661,7 +660,7 @@ export default function UsuariosPage() {
                   <Button
                     variant={usuarioDetalhes.ativo ? 'destructive' : 'default'}
                     onClick={() => {
-                      alterarStatus(usuarioDetalhes.id, !usuarioDetalhes.ativo);
+                      alterarStatus(usuarioDetalhes?.id, !usuarioDetalhes.ativo);
                       setDialogDetalhes(false);
                     }}
                   >
