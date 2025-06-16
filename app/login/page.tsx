@@ -24,9 +24,9 @@ export default function LoginPage() {
     setErro("")
 
     try {
-      const usuario = login(email, senha)
+      const usuario = await login(email, senha)
       if (usuario) {
-        setCurrentUser(usuario)
+        setCurrentUser(usuario.usuario, usuario.token)
         router.push("/")
       } else {
         setErro("Email ou senha inválidos")
