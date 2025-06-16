@@ -3,12 +3,12 @@ import { getFirestore, Firestore } from 'firebase/firestore';
 import { getAuth, Auth } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDwwIpc8qLLVM2aeXOBdDRPJVaBJzICUYw",
-  authDomain: "gestao-salas-86300.firebaseapp.com",
-  projectId: "gestao-salas-86300",
-  storageBucket: "gestao-salas-86300.firebasestorage.app",
-  messagingSenderId: "772475863859",
-  appId: "1:772475863859:web:43f90a07fe720fb4d6b446"
+  apiKey: process.env.APIKEY,
+  authDomain: process.env.AUTHDOMAIN,
+  projectId: process.env.PROJECTID,
+  storageBucket: process.env.STORAGEBUCKET,
+  messagingSenderId: process.env.MESSAGINGSENDERID,
+  appId: process.env.APPID,
 };
 
 let app: FirebaseApp;
