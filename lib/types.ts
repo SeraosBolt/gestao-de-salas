@@ -57,7 +57,7 @@ export interface Chamado {
   salaId?: string;
   sala?: string;
   solicitante: string;
-  solicitanteId: string;
+  solicitanteId: string | undefined;
   responsavel?: string;
   responsavelId?: string;
   dataAbertura: Timestamp; // Alterado para Timestamp

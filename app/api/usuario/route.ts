@@ -18,13 +18,13 @@ export async function POST(request: Request) {
     }
     const UsuarioId = await usuarioService.create(UsuarioData);
     return NextResponse.json(
-      { id: UsuarioId, message: 'Empresa cliente criada com sucesso' },
+      { id: UsuarioId, message: 'Usuário criado com sucesso' },
       { status: 201 }
     );
   } catch (error: any) {
-    console.error('Erro ao criar empresa cliente:', error);
+    console.error('Erro ao criar Usuário', error);
     return NextResponse.json(
-      { error: error.message || 'Falha ao criar empresa cliente' },
+      { error: error.message || 'Falha ao criar Usuário' },
       { status: 500 }
     );
   }

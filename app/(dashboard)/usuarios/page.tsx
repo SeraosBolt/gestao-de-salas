@@ -61,6 +61,7 @@ import { usuarios as usuariosIniciais } from '@/lib/data';
 import type { Usuario } from '@/lib/types';
 import { getCurrentUser } from '@/lib/auth';
 import { ProtectedRoute } from '@/components/protected-route';
+import { useCreateUsuario } from '@/hooks/use-usuarios';
 
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] =
@@ -73,7 +74,7 @@ export default function UsuariosPage() {
   const [tipoFiltro, setTipoFiltro] = useState<string>('todos');
   const [statusFiltro, setStatusFiltro] = useState<string>('todos');
   const [usuario, setUsuario] = useState(getCurrentUser());
-
+  const { mutateAsync: createUsuario, isPending } = useCreateUsuario();
   const [formData, setFormData] = useState({
     nome: '',
     email: '',
@@ -141,17 +142,21 @@ export default function UsuariosPage() {
       );
     } else {
       // Criar novo usuário
-      const novoUsuario: Usuario = {
-        nome: formData.nome,
-        email: formData.email,
-        senha: 'senha123', // Em um sistema real, a senha deve ser gerada e armazenada de forma segura
-        tipo: formData.tipo,
-        ativo: formData.ativo,
-        departamento: formData.departamento,
-        telefone: formData.telefone,
-        foto: 'https://www.shutterstock.com/pt/image-photo/selfie-influencer-girl-live-streaming-update-2489152413',
-      };
-      setUsuarios([...usuarios, novoUsuario]);
+      try {
+        const novoUsuario: Usuario = {
+          nome: formData.nome,
+          email: formData.email,
+          senha: 'senha123', // Em um sistema real, a senha deve ser gerada e armazenada de forma segura
+          tipo: formData.tipo,
+          ativo: formData.ativo,
+          departamento: formData.departamento,
+          telefone: formData.telefone,
+          foto: 'https://www.shutterstock.com/pt/image-photo/selfie-influencer-girl-live-streaming-update-2489152413',
+        };
+        const response = createUsuario(novoUsuario);
+        form.reset();
+        toast.success(response.message || 'Funcionário criado com sucesso!');
+      } catch (error) {}
     }
 
     setDialogAberto(false);
@@ -660,7 +665,10 @@ export default function UsuariosPage() {
                   <Button
                     variant={usuarioDetalhes.ativo ? 'destructive' : 'default'}
                     onClick={() => {
-                      alterarStatus(usuarioDetalhes?.id, !usuarioDetalhes.ativo);
+                      alterarStatus(
+                        usuarioDetalhes?.id,
+                        !usuarioDetalhes.ativo
+                      );
                       setDialogDetalhes(false);
                     }}
                   >

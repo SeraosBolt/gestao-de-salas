@@ -104,7 +104,7 @@ export default function SuportePage() {
     resetForm();
   };
 
-  const atribuirChamado = (chamadoId: string, responsavelId: string) => {
+  const atribuirChamado = (chamadoId: string, responsavelId: string | undefined) => {
     const responsavel = usuarios.find((u) => u.id === responsavelId);
     if (!responsavel) return;
 
