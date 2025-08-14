@@ -62,6 +62,7 @@ import type { Usuario } from '@/lib/types';
 import { getCurrentUser } from '@/lib/auth';
 import { ProtectedRoute } from '@/components/protected-route';
 import { useCreateUsuario } from '@/hooks/use-usuarios';
+import { toast } from 'sonner';
 
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] =
@@ -154,8 +155,8 @@ export default function UsuariosPage() {
           foto: 'https://www.shutterstock.com/pt/image-photo/selfie-influencer-girl-live-streaming-update-2489152413',
         };
         const response = createUsuario(novoUsuario);
-        form.reset();
-        toast.success(response.message || 'Funcionário criado com sucesso!');
+        // form.reset();
+        toast.success( 'Funcionário criado com sucesso!');
       } catch (error) {}
     }
 
