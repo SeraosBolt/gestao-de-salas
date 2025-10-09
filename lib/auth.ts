@@ -1,7 +1,7 @@
 import type { Usuario } from './types';
 // Simple token structure for client-side use
 interface SimpleToken {
-  userId: string;
+  userId: string | undefined;
   email: string;
   tipo: string | undefined;
   nome: string;

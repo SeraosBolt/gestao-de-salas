@@ -85,13 +85,24 @@ export const usuarioService = {
   },
 
   getByEmail: async (email: string): Promise<Usuario | null> => {
+    console.log(`Buscando usuário por email: ${email}`);
+    console.log(`Coleção de usuários: ${USUARIOS_COLLECTION}`);
+    console.log(`Referência da coleção:`, collection(db, USUARIOS_COLLECTION));
     if (!email) return null;
     const q = query(
       collection(db, USUARIOS_COLLECTION),
       where('email', '==', email)
     );
+    if (!q) {
+      console.error('Query inválida para busca por email:', email);
+      return null;
+    }
+
     const querySnapshot = await getDocs(q);
+    console.log(`Buscando usuário por email: ${email}`);
+    console.log(`Número de usuários encontrados: ${querySnapshot.size}`);
     if (querySnapshot.empty) return null;
+
     return fromFirestore<Usuario>(querySnapshot.docs[0]);
   },
   /**
