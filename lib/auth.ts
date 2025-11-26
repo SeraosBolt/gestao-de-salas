@@ -18,9 +18,26 @@ export async function login(
   email: string,
   senha: string
 ): Promise<{ usuario: Usuario; token: string } | null> {
-  // Simulação de autenticação - em produção usar hash de senha
-  const usuario = await usuarioService.getByEmail(email);
-  if (usuario && usuario.senha === senha) {
+  try {
+    console.log('🔐 Tentando login com email:', email);
+    
+    // Simulação de autenticação - em produção usar hash de senha
+    const usuario = await usuarioService.getByEmail(email);
+    
+    if (!usuario) {
+      console.warn('⚠️ Usuário não encontrado');
+      return null;
+    }
+    
+    console.log('👤 Usuário encontrado, verificando senha...');
+    
+    if (usuario.senha !== senha) {
+      console.warn('⚠️ Senha incorreta');
+      return null;
+    }
+    
+    console.log('✅ Login bem-sucedido!');
+    
     // Create simple token
     const token = generateToken(usuario);
 
@@ -28,8 +45,10 @@ export async function login(
     const updatedUser = { ...usuario, ultimoAcesso: Timestamp.now() };
 
     return { usuario: updatedUser, token };
+  } catch (error: any) {
+    console.error('❌ Erro durante login:', error);
+    throw error;
   }
-  return null;
 }
 export function generateToken(usuario: Usuario): string {
   const tokenData: SimpleToken = {

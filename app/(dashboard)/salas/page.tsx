@@ -17,7 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Edit, Users, Monitor, MapPin } from "lucide-react"
+import { Plus, Edit, Users, Monitor, MapPin, Search, Building, CheckCircle, AlertTriangle, Wrench } from "lucide-react"
 import { salas as salasIniciais } from "@/lib/data"
 import type { Sala } from "@/lib/types"
 import { getCurrentUser } from "@/lib/auth"
@@ -27,6 +27,10 @@ export default function SalasPage() {
   const [dialogAberto, setDialogAberto] = useState(false)
   const [salaEditando, setSalaEditando] = useState<Sala | null>(null)
   const [usuario, setUsuario] = useState(getCurrentUser())
+
+  const [filtro, setFiltro] = useState("")
+  const [statusFiltro, setStatusFiltro] = useState<string>("todos")
+  const [capacidadeFiltro, setCapacidadeFiltro] = useState<string>("todos")
 
   const [formData, setFormData] = useState({
     nome: "",
@@ -74,7 +78,6 @@ export default function SalasPage() {
       .filter((eq) => eq.length > 0)
 
     if (salaEditando) {
-      // Editar sala existente
       setSalas(
         salas.map((sala) =>
           sala.id === salaEditando.id
@@ -90,7 +93,6 @@ export default function SalasPage() {
         ),
       )
     } else {
-      // Criar nova sala
       const novaSala: Sala = {
         id: Date.now().toString(),
         nome: formData.nome,
@@ -132,6 +134,157 @@ export default function SalasPage() {
     }
   }
 
+  const salasFiltradas = salas.filter((s) => {
+    const matchFiltro =
+      filtro === "" ||
+      s.nome.toLowerCase().includes(filtro.toLowerCase()) ||
+      s.localizacao.toLowerCase().includes(filtro.toLowerCase()) ||
+      s.equipamentos.some((eq) => eq.toLowerCase().includes(filtro.toLowerCase()))
+
+    const matchStatus = statusFiltro === "todos" || s.status === statusFiltro
+
+    const matchCapacidade =
+      capacidadeFiltro === "todos" ||
+      (capacidadeFiltro === "pequena" && s.capacidade <= 30) ||
+      (capacidadeFiltro === "media" && s.capacidade > 30 && s.capacidade <= 60) ||
+      (capacidadeFiltro === "grande" && s.capacidade > 60)
+
+    return matchFiltro && matchStatus && matchCapacidade
+  })
+
+  const totalSalas = salas.length
+  const salasDisponiveis = salas.filter((s) => s.status === "disponivel").length
+  const salasOcupadas = salas.filter((s) => s.status === "ocupada").length
+  const salasManutencao = salas.filter((s) => s.status === "manutencao").length
+
+  const RoomCard = ({ sala, showEdit = false }: { sala: Sala; showEdit?: boolean }) => (
+    <Card key={sala.id}>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">{sala.nome}</CardTitle>
+          <div className="flex items-center gap-2">
+            <Badge variant={getStatusColor(sala.status)}>{getStatusText(sala.status)}</Badge>
+            {showEdit && (
+              <Button variant="ghost" size="sm" onClick={() => abrirDialog(sala)}>
+                <Edit className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+        <CardDescription className="flex items-center gap-1">
+          <MapPin className="h-4 w-4" />
+          {sala.localizacao}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm">Capacidade: {sala.capacidade} pessoas</span>
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Monitor className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Equipamentos:</span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {sala.equipamentos.map((equipamento, index) => (
+                <Badge key={index} variant="outline" className="text-xs">
+                  {equipamento}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+
+  const FiltersSection = () => (
+    <div className="flex flex-col sm:flex-row gap-4">
+      <div className="relative flex-1">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por nome, localização ou equipamento..."
+          className="pl-8"
+          value={filtro}
+          onChange={(e) => setFiltro(e.target.value)}
+        />
+      </div>
+      <Select value={statusFiltro} onValueChange={setStatusFiltro}>
+        <SelectTrigger className="w-[180px]">
+          <SelectValue placeholder="Status" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="todos">Todos os Status</SelectItem>
+          <SelectItem value="disponivel">Disponível</SelectItem>
+          <SelectItem value="ocupada">Ocupada</SelectItem>
+          <SelectItem value="manutencao">Manutenção</SelectItem>
+        </SelectContent>
+      </Select>
+      <Select value={capacidadeFiltro} onValueChange={setCapacidadeFiltro}>
+        <SelectTrigger className="w-[180px]">
+          <SelectValue placeholder="Capacidade" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="todos">Todas Capacidades</SelectItem>
+          <SelectItem value="pequena">Pequena (até 30)</SelectItem>
+          <SelectItem value="media">Média (31-60)</SelectItem>
+          <SelectItem value="grande">Grande (60+)</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  )
+
+  const StatsCards = () => (
+    <div className="grid gap-4 md:grid-cols-4">
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2">
+            <Building className="h-4 w-4 text-blue-500" />
+            <div>
+              <p className="text-sm font-medium">Total de Salas</p>
+              <p className="text-2xl font-bold text-blue-600">{totalSalas}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="h-4 w-4 text-green-500" />
+            <div>
+              <p className="text-sm font-medium">Disponíveis</p>
+              <p className="text-2xl font-bold text-green-600">{salasDisponiveis}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-orange-500" />
+            <div>
+              <p className="text-sm font-medium">Ocupadas</p>
+              <p className="text-2xl font-bold text-orange-600">{salasOcupadas}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2">
+            <Wrench className="h-4 w-4 text-red-500" />
+            <div>
+              <p className="text-sm font-medium">Manutenção</p>
+              <p className="text-2xl font-bold text-red-600">{salasManutencao}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+
   if (usuario?.tipo !== "coordenador") {
     return (
       <div className="space-y-6">
@@ -140,42 +293,22 @@ export default function SalasPage() {
           <p className="text-muted-foreground">Visualização das salas disponíveis</p>
         </div>
 
+        <StatsCards />
+        <FiltersSection />
+
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {salas.map((sala) => (
-            <Card key={sala.id}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">{sala.nome}</CardTitle>
-                  <Badge variant={getStatusColor(sala.status)}>{getStatusText(sala.status)}</Badge>
-                </div>
-                <CardDescription className="flex items-center gap-1">
-                  <MapPin className="h-4 w-4" />
-                  {sala.localizacao}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">Capacidade: {sala.capacidade} pessoas</span>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Monitor className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">Equipamentos:</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {sala.equipamentos.map((equipamento, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {equipamento}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+          {salasFiltradas.map((sala) => (
+            <RoomCard key={sala.id} sala={sala} />
+          ))}
+          {salasFiltradas.length === 0 && (
+            <Card className="col-span-full">
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Building className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">Nenhuma sala encontrada</h3>
+                <p className="text-muted-foreground text-center">Tente ajustar os filtros para encontrar salas.</p>
               </CardContent>
             </Card>
-          ))}
+          )}
         </div>
       </div>
     )
@@ -266,47 +399,22 @@ export default function SalasPage() {
         </Dialog>
       </div>
 
+      <StatsCards />
+      <FiltersSection />
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {salas.map((sala) => (
-          <Card key={sala.id}>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">{sala.nome}</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Badge variant={getStatusColor(sala.status)}>{getStatusText(sala.status)}</Badge>
-                  <Button variant="ghost" size="sm" onClick={() => abrirDialog(sala)}>
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <CardDescription className="flex items-center gap-1">
-                <MapPin className="h-4 w-4" />
-                {sala.localizacao}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">Capacidade: {sala.capacidade} pessoas</span>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Monitor className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Equipamentos:</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {sala.equipamentos.map((equipamento, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {equipamento}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              </div>
+        {salasFiltradas.map((sala) => (
+          <RoomCard key={sala.id} sala={sala} showEdit />
+        ))}
+        {salasFiltradas.length === 0 && (
+          <Card className="col-span-full">
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Building className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">Nenhuma sala encontrada</h3>
+              <p className="text-muted-foreground text-center">Tente ajustar os filtros para encontrar salas.</p>
             </CardContent>
           </Card>
-        ))}
+        )}
       </div>
     </div>
   )

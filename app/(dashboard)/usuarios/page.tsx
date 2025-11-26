@@ -65,63 +65,62 @@ import { useCreateUsuario } from '@/hooks/use-usuarios';
 import { toast } from 'sonner';
 
 export default function UsuariosPage() {
-  const [usuarios, setUsuarios] =
-    useState<Partial<Usuario>[]>(usuariosIniciais);
-  const [dialogAberto, setDialogAberto] = useState(false);
-  const [dialogDetalhes, setDialogDetalhes] = useState(false);
-  const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null);
-  const [usuarioDetalhes, setUsuarioDetalhes] = useState<Usuario | null>(null);
-  const [filtro, setFiltro] = useState('');
-  const [tipoFiltro, setTipoFiltro] = useState<string>('todos');
-  const [statusFiltro, setStatusFiltro] = useState<string>('todos');
-  const [usuario, setUsuario] = useState(getCurrentUser());
-  const { mutateAsync: createUsuario, isPending } = useCreateUsuario();
+const [usuarios, setUsuarios] = useState<Usuario[]>(usuariosIniciais)
+  const [dialogAberto, setDialogAberto] = useState(false)
+  const [dialogDetalhes, setDialogDetalhes] = useState(false)
+  const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null)
+  const [usuarioDetalhes, setUsuarioDetalhes] = useState<Usuario | null>(null)
+  const [filtro, setFiltro] = useState("")
+  const [tipoFiltro, setTipoFiltro] = useState<string>("todos")
+  const [statusFiltro, setStatusFiltro] = useState<string>("todos")
+  const [usuario, setUsuario] = useState(getCurrentUser())
+const { mutateAsync: createUsuario, isPending } = useCreateUsuario();
   const [formData, setFormData] = useState({
-    nome: '',
-    email: '',
-    tipo: 'professor' as Usuario['tipo'],
+    nome: "",
+    email: "",
+    tipo: "professor" as Usuario["tipo"],
     ativo: true,
-    departamento: '',
-    telefone: '',
-  });
+    departamento: "",
+    telefone: "",
+  })
 
   useEffect(() => {
-    setUsuario(getCurrentUser());
-  }, []);
+    setUsuario(getCurrentUser())
+  }, [])
 
   const resetForm = () => {
     setFormData({
-      nome: '',
-      email: '',
-      tipo: 'professor',
+      nome: "",
+      email: "",
+      tipo: "professor",
       ativo: true,
-      departamento: '',
-      telefone: '',
-    });
-    setUsuarioEditando(null);
-  };
+      departamento: "",
+      telefone: "",
+    })
+    setUsuarioEditando(null)
+  }
 
   const abrirDialog = (usuario?: Usuario) => {
     if (usuario) {
-      setUsuarioEditando(usuario);
+      setUsuarioEditando(usuario)
       setFormData({
         nome: usuario.nome,
         email: usuario.email,
         tipo: usuario.tipo,
         ativo: usuario.ativo,
-        departamento: usuario.departamento || '',
-        telefone: usuario.telefone || '',
-      });
+        departamento: usuario.departamento || "",
+        telefone: usuario.telefone || "",
+      })
     } else {
-      resetForm();
+      resetForm()
     }
-    setDialogAberto(true);
-  };
+    setDialogAberto(true)
+  }
 
-  const abrirDetalhes = (usuario: Usuario | undefined) => {
-    setUsuarioDetalhes(usuario as Usuario);
-    setDialogDetalhes(true);
-  };
+  const abrirDetalhes = (usuario: Usuario) => {
+    setUsuarioDetalhes(usuario)
+    setDialogDetalhes(true)
+  }
 
   const salvarUsuario = () => {
     if (usuarioEditando) {

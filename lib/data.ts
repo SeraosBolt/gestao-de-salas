@@ -1,35 +1,97 @@
+import { Timestamp } from "firebase/firestore"
 import type { Usuario, Sala, Aula, Chamado } from "./types"
 
-export const usuarios: Partial<Usuario>[] = [
+export const usuarios: Usuario[] = [
   {
     id: "1",
     nome: "Prof. João Silva",
     email: "joao.silva@universidade.edu",
     tipo: "professor",
+    ativo: true,
+    created_at: Timestamp.fromDate(new Date("2024-01-15T10:00:00")),
+    senha: "",
+    ultimoAcesso: Timestamp.fromDate(new Date("2024-01-15T10:00:00")),
+    departamento: "Ciência da Computação",
+    telefone: "(11) 98765-4321",
+    foto: "/placeholder.svg?height=128&width=128",
   },
   {
     id: "2",
     nome: "Maria Santos",
     email: "maria.santos@universidade.edu",
     tipo: "coordenador",
+    ativo: true,
+    created_at: Timestamp.fromDate(new Date("2024-01-15T10:00:00")),
+    senha: "",
+    ultimoAcesso: Timestamp.fromDate(new Date("2024-01-15T10:00:00")),
+    departamento: "Administração Acadêmica",
+    telefone: "(11) 91234-5678",
+    foto: "/placeholder.svg?height=128&width=128",
   },
   {
     id: "3",
     nome: "Prof. Ana Costa",
     email: "ana.costa@universidade.edu",
     tipo: "professor",
+    ativo: true,
+    created_at: Timestamp.fromDate(new Date("2024-01-15T10:00:00")),
+    senha: "",
+    ultimoAcesso: Timestamp.fromDate(new Date("2024-01-15T10:00:00")),
+    departamento: "Engenharia de Software",
+    telefone: "(11) 97654-3210",
+    foto: "/placeholder.svg?height=128&width=128",
   },
   {
     id: "4",
     nome: "Carlos Oliveira",
     email: "carlos.oliveira@universidade.edu",
     tipo: "suporte",
+    ativo: true,
+    created_at: Timestamp.fromDate(new Date("2024-01-15T10:00:00")),
+    senha: "",
+    ultimoAcesso: Timestamp.fromDate(new Date("2024-01-15T10:00:00")),
+    departamento: "Suporte Técnico",
+    telefone: "(11) 95555-9999",
+    foto: "/placeholder.svg?height=128&width=128",
   },
   {
     id: "5",
     nome: "Fernanda Lima",
     email: "fernanda.lima@universidade.edu",
     tipo: "suporte",
+    ativo: true,
+    created_at: Timestamp.fromDate(new Date("2024-01-15T10:00:00")),
+    senha: "",
+    ultimoAcesso: Timestamp.fromDate(new Date("2024-01-15T10:00:00")),
+    departamento: "Suporte Técnico",
+    telefone: "(11) 94444-8888",
+    foto: "/placeholder.svg?height=128&width=128",
+  },
+  {
+    id: "6",
+    nome: "Roberto Almeida",
+    email: "roberto.almeida@universidade.edu",
+    tipo: "professor",
+    ativo: false,
+    created_at: Timestamp.fromDate(new Date("2024-01-15T10:00:00")),
+    senha: "",
+    ultimoAcesso: Timestamp.fromDate(new Date("2024-01-15T10:00:00")),
+    departamento: "Matemática",
+    telefone: "(11) 93333-7777",
+    foto: "/placeholder.svg?height=128&width=128",
+  },
+  {
+    id: "7",
+    nome: "Luciana Ferreira",
+    email: "luciana.ferreira@universidade.edu",
+    tipo: "professor",
+    ativo: true,
+    created_at: Timestamp.fromDate(new Date("2024-01-15T10:00:00")),
+    senha: "",
+    ultimoAcesso: Timestamp.fromDate(new Date("2024-01-15T10:00:00")),
+    departamento: "Física",
+    telefone: "(11) 92222-6666",
+    foto: "/placeholder.svg?height=128&width=128",
   },
 ]
 
@@ -72,35 +134,157 @@ export const aulas: Aula[] = [
   {
     id: "1",
     disciplina: "Programação Web",
-    professor: "Prof. João Silva",
-    professorId: "1",
+    professores: [
+      { id: "1", nome: "Prof. João Silva" },
+      { id: "3", nome: "Prof. Ana Costa" },
+    ],
     salaId: "1",
     sala: "Sala 101",
-    dataHora: "2024-12-02T08:00:00" as any,
-    duracao: 120,
+    salasAtribuicoes: [
+      { professorId: "1", professorNome: "Prof. João Silva", salaId: "1", salaNome: "Sala 101" },
+      { professorId: "3", professorNome: "Prof. Ana Costa", salaId: "2", salaNome: "Sala 102" },
+    ],
+    horarios: [
+      { diaSemana: 1, horaInicio: "08:00", horaFim: "10:00" }, // Segunda
+      { diaSemana: 3, horaInicio: "08:00", horaFim: "10:00" }, // Quarta
+    ],
     status: "agendada",
+    cor: "#3b82f6",
+    periodoInicio: "2024-08-01",
+    periodoFim: "2024-12-15",
   },
   {
     id: "2",
     disciplina: "Banco de Dados",
-    professor: "Prof. Ana Costa",
-    professorId: "3",
+    professores: [{ id: "3", nome: "Prof. Ana Costa" }],
     salaId: "3",
     sala: "Lab Informática",
-    dataHora: "2024-12-02T10:00:00" as any,
-    duracao: 90,
+    salasAtribuicoes: [
+      { professorId: "3", professorNome: "Prof. Ana Costa", salaId: "3", salaNome: "Lab Informática" },
+    ],
+    horarios: [
+      { diaSemana: 2, horaInicio: "10:00", horaFim: "11:30" }, // Terça
+      { diaSemana: 4, horaInicio: "10:00", horaFim: "11:30" }, // Quinta
+    ],
     status: "agendada",
+    cor: "#10b981",
+    periodoInicio: "2024-08-01",
+    periodoFim: "2024-12-15",
   },
   {
     id: "3",
     disciplina: "Algoritmos",
-    professor: "Prof. João Silva",
-    professorId: "1",
+    professores: [{ id: "1", nome: "Prof. João Silva" }],
     salaId: "2",
     sala: "Sala 102",
-    dataHora: "2024-12-02T14:00:00" as any,
-    duracao: 120,
-    status: "em_andamento",
+    salasAtribuicoes: [{ professorId: "1", professorNome: "Prof. João Silva", salaId: "2", salaNome: "Sala 102" }],
+    horarios: [
+      { diaSemana: 1, horaInicio: "14:00", horaFim: "16:00" }, // Segunda
+      { diaSemana: 5, horaInicio: "14:00", horaFim: "16:00" }, // Sexta
+    ],
+    status: "agendada",
+    cor: "#f59e0b",
+    periodoInicio: "2024-08-01",
+    periodoFim: "2024-12-15",
+  },
+  {
+    id: "4",
+    disciplina: "Estrutura de Dados",
+    professores: [
+      { id: "3", nome: "Prof. Ana Costa" },
+      { id: "7", nome: "Luciana Ferreira" },
+    ],
+    salaId: "1",
+    sala: "Sala 101",
+    salasAtribuicoes: [
+      { professorId: "3", professorNome: "Prof. Ana Costa", salaId: "1", salaNome: "Sala 101" },
+      { professorId: "7", professorNome: "Luciana Ferreira", salaId: "3", salaNome: "Lab Informática" },
+    ],
+    horarios: [
+      { diaSemana: 2, horaInicio: "19:00", horaFim: "21:00" }, // Terça
+      { diaSemana: 4, horaInicio: "19:00", horaFim: "21:00" }, // Quinta
+    ],
+    status: "agendada",
+    cor: "#8b5cf6",
+    periodoInicio: "2024-08-01",
+    periodoFim: "2024-12-15",
+  },
+  {
+    id: "5",
+    disciplina: "Física Aplicada",
+    professores: [{ id: "7", nome: "Luciana Ferreira" }],
+    salaId: "2",
+    sala: "Sala 102",
+    salasAtribuicoes: [{ professorId: "7", professorNome: "Luciana Ferreira", salaId: "2", salaNome: "Sala 102" }],
+    horarios: [
+      { diaSemana: 3, horaInicio: "14:00", horaFim: "16:00" }, // Quarta
+    ],
+    status: "agendada",
+    cor: "#ec4899",
+    periodoInicio: "2024-08-01",
+    periodoFim: "2024-12-15",
+  },
+  {
+    id: "6",
+    disciplina: "Redes de Computadores",
+    professores: [{ id: "1", nome: "Prof. João Silva" }],
+    salaId: "3",
+    sala: "Lab Informática",
+    salasAtribuicoes: [
+      { professorId: "1", professorNome: "Prof. João Silva", salaId: "3", salaNome: "Lab Informática" },
+    ],
+    horarios: [
+      { diaSemana: 1, horaInicio: "19:00", horaFim: "22:00" }, // Segunda
+    ],
+    status: "agendada",
+    cor: "#06b6d4",
+    periodoInicio: "2024-08-01",
+    periodoFim: "2024-12-15",
+  },
+  {
+    id: "7",
+    disciplina: "Inteligência Artificial",
+    professores: [{ id: "3", nome: "Prof. Ana Costa" }],
+    salaId: "1",
+    sala: "Sala 101",
+    salasAtribuicoes: [{ professorId: "3", professorNome: "Prof. Ana Costa", salaId: "1", salaNome: "Sala 101" }],
+    horarios: [
+      { diaSemana: 5, horaInicio: "08:00", horaFim: "10:00" }, // Sexta
+    ],
+    status: "agendada",
+    cor: "#f97316",
+    periodoInicio: "2024-08-01",
+    periodoFim: "2024-12-15",
+  },
+  {
+    id: "8",
+    disciplina: "Cálculo I - Turma A",
+    professores: [{ id: "7", nome: "Luciana Ferreira" }],
+    salaId: "1",
+    sala: "Sala 101",
+    salasAtribuicoes: [{ professorId: "7", professorNome: "Luciana Ferreira", salaId: "1", salaNome: "Sala 101" }],
+    horarios: [
+      { diaSemana: 2, horaInicio: "08:00", horaFim: "10:00" }, // Terça
+    ],
+    status: "agendada",
+    cor: "#14b8a6",
+    periodoInicio: "2024-08-01",
+    periodoFim: "2024-12-15",
+  },
+  {
+    id: "9",
+    disciplina: "Cálculo I - Turma B",
+    professores: [{ id: "1", nome: "Prof. João Silva" }],
+    salaId: "2",
+    sala: "Sala 102",
+    salasAtribuicoes: [{ professorId: "1", professorNome: "Prof. João Silva", salaId: "2", salaNome: "Sala 102" }],
+    horarios: [
+      { diaSemana: 2, horaInicio: "08:00", horaFim: "10:00" }, // Terça - mesmo horário, sala diferente
+    ],
+    status: "agendada",
+    cor: "#14b8a6",
+    periodoInicio: "2024-08-01",
+    periodoFim: "2024-12-15",
   },
 ]
 

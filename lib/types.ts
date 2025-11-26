@@ -34,35 +34,55 @@ export interface Sala {
 }
 
 export interface Aula {
-  id: string;
-  disciplina: string;
-  professor: string;
-  professorId: string;
-  salaId: string;
-  sala: string;
-  dataHora: Timestamp; // Alterado para Timestamp para melhor consulta
-  duracao: number; // em minutos
-  status: "agendada" | "em_andamento" | "concluida" | "cancelada";
-  created_at?: Timestamp;
-  updated_at?: Timestamp;
+  id: string
+  disciplina: string
+  professores: {
+    id: string
+    nome: string
+  }[]
+  // Legacy - primary room
+  salaId: string
+  sala: string
+  // New: professor-room assignments
+  salasAtribuicoes?: ProfessorSalaAssignment[]
+  horarios: HorarioSemanal[]
+  // Legacy field for backward compatibility
+  dataHora?: string
+  duracao?: number
+  status: "agendada" | "em_andamento" | "concluida" | "cancelada"
+  cor?: string
+  periodoInicio?: string
+  periodoFim?: string
 }
 
+export interface HorarioSemanal {
+  diaSemana: number // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
+  horaInicio: string // "19:00"
+  horaFim: string // "21:00"
+}
+
+export interface ProfessorSalaAssignment {
+  professorId: string
+  professorNome: string
+  salaId: string
+  salaNome: string
+}
+
+
 export interface Chamado {
-  id: string;
-  titulo: string;
-  descricao: string;
-  tipo: "manutencao" | "equipamento" | "limpeza" | "outro";
-  prioridade: "baixa" | "media" | "alta" | "urgente";
-  status: "aberto" | "em_andamento" | "resolvido" | "fechado";
-  salaId?: string;
-  sala?: string;
-  solicitante: string;
-  solicitanteId: string | undefined;
-  responsavel?: string;
-  responsavelId?: string;
-  dataAbertura: Timestamp; // Alterado para Timestamp
-  dataResolucao?: Timestamp;
-  observacoes?: string;
-  created_at?: Timestamp;
-  updated_at?: Timestamp;
+  id: string
+  titulo: string
+  descricao: string
+  tipo: "manutencao" | "equipamento" | "limpeza" | "outro"
+  prioridade: "baixa" | "media" | "alta" | "urgente"
+  status: "aberto" | "em_andamento" | "resolvido" | "fechado"
+  salaId?: string
+  sala?: string
+  solicitante: string
+  solicitanteId: string
+  responsavel?: string
+  responsavelId?: string
+  dataAbertura: string
+  dataResolucao?: string
+  observacoes?: string
 }

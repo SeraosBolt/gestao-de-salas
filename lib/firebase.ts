@@ -13,6 +13,24 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_APPID,
 };
 
+// Validação das variáveis de ambiente em desenvolvimento
+if (process.env.NODE_ENV === 'development') {
+  const missingVars = [];
+  if (!firebaseConfig.apiKey) missingVars.push('NEXT_PUBLIC_APIKEY');
+  if (!firebaseConfig.authDomain) missingVars.push('NEXT_PUBLIC_AUTHDOMAIN');
+  if (!firebaseConfig.projectId) missingVars.push('NEXT_PUBLIC_PROJECTID');
+  
+  if (missingVars.length > 0) {
+    console.error('❌ Variáveis de ambiente Firebase faltando:', missingVars);
+    console.error('📋 Configure o arquivo .env.local com suas credenciais do Firebase');
+  } else {
+    console.log('✅ Configuração Firebase carregada:', {
+      projectId: firebaseConfig.projectId,
+      authDomain: firebaseConfig.authDomain
+    });
+  }
+}
+
 let app: FirebaseApp;
 if (!getApps().length) {
   app = initializeApp(firebaseConfig);

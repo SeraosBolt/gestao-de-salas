@@ -85,25 +85,41 @@ export const usuarioService = {
   },
 
   getByEmail: async (email: string): Promise<Usuario | null> => {
-    console.log(`Buscando usuário por email: ${email}`);
-    console.log(`Coleção de usuários: ${USUARIOS_COLLECTION}`);
-    console.log(`Referência da coleção:`, collection(db, USUARIOS_COLLECTION));
-    if (!email) return null;
-    const q = query(
-      collection(db, USUARIOS_COLLECTION),
-      where('email', '==', email)
-    );
-    if (!q) {
-      console.error('Query inválida para busca por email:', email);
-      return null;
+    try {
+      if (!email) {
+        console.error('❌ Email não fornecido');
+        return null;
+      }
+
+      console.log(`🔍 Buscando usuário por email: ${email}`);
+      
+      const q = query(
+        collection(db, USUARIOS_COLLECTION),
+        where('email', '==', email)
+      );
+
+      const querySnapshot = await getDocs(q);
+      
+      console.log(`📊 Resultados encontrados: ${querySnapshot.docs.length}`);
+      
+      if (querySnapshot.empty) {
+        console.warn(`⚠️ Nenhum usuário encontrado com o email: ${email}`);
+        return null;
+      }
+      
+      const usuario = fromFirestore<Usuario>(querySnapshot.docs[0]);
+      console.log(`✅ Usuário encontrado: ${usuario.nome}`);
+      
+      return usuario;
+    } catch (error: any) {
+      console.error('❌ Erro ao buscar usuário por email:', error);
+      console.error('Detalhes do erro:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack
+      });
+      throw error;
     }
-
-    const querySnapshot = await getDocs(q);
-    console.log(`Buscando usuário por email: ${email}`);
-    console.log(`Número de usuários encontrados: ${querySnapshot.size}`);
-    if (querySnapshot.empty) return null;
-
-    return fromFirestore<Usuario>(querySnapshot.docs[0]);
   },
   /**
    * Atualiza os dados de um usuário.

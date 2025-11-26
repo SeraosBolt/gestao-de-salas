@@ -24,15 +24,19 @@ export default function LoginPage() {
     setErro("")
 
     try {
+      console.log('📝 Iniciando processo de login...')
       const usuario = await login(email, senha)
       if (usuario) {
+        console.log('✅ Login bem-sucedido, redirecionando...')
         setCurrentUser(usuario.usuario, usuario.token)
         router.push("/")
       } else {
+        console.warn('⚠️ Credenciais inválidas')
         setErro("Email ou senha inválidos")
       }
-    } catch (error) {
-      setErro("Erro ao fazer login")
+    } catch (error: any) {
+      console.error('❌ Erro no handleSubmit:', error)
+      setErro(`Erro ao fazer login: ${error.message || 'Erro desconhecido'}`)
     } finally {
       setCarregando(false)
     }
@@ -78,24 +82,6 @@ export default function LoginPage() {
               {carregando ? "Entrando..." : "Entrar"}
             </Button>
           </form>
-
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <p className="text-sm font-medium text-blue-900 mb-2">Usuários de teste:</p>
-            <div className="text-xs text-blue-700 space-y-1">
-              <p>
-                <strong>Coordenador:</strong> maria.santos@universidade.edu
-              </p>
-              <p>
-                <strong>Professor:</strong> joao.silva@universidade.edu
-              </p>
-              <p>
-                <strong>Suporte:</strong> carlos.oliveira@universidade.edu
-              </p>
-              <p>
-                <strong>Senha:</strong> 123456
-              </p>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>
