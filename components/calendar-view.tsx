@@ -284,7 +284,7 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-500">
       {/* Header do Calendário */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 pb-4 border-b">
         <div className="flex items-center gap-4">
@@ -330,7 +330,7 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
 
       {/* Grid do Calendário */}
       <div className="flex-1 overflow-auto">
-        <div className="min-w-[900px]">
+        <div className="">
           {/* Cabeçalho dos dias */}
           <div
             className="grid border-b sticky top-0 bg-background z-10"
@@ -457,7 +457,7 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
 
       {/* Dialog de detalhes da aula */}
       <Dialog open={!!aulaDetalhes} onOpenChange={() => setAulaDetalhes(null)}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-h-[80vh] w-full max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <div
@@ -469,7 +469,7 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
             <DialogDescription>Detalhes da aula agendada</DialogDescription>
           </DialogHeader>
           {aulaDetalhes && (
-            <div className="space-y-4 pt-4">
+            <div className="space-y-4 pt-4 overflow-y-scroll">
               {aulaDetalhes.aula.salasAtribuicoes && aulaDetalhes.aula.salasAtribuicoes.length > 0 ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">

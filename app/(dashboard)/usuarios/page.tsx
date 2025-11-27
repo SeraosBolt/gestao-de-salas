@@ -57,93 +57,98 @@ import {
   BookOpen,
   Headphones,
 } from 'lucide-react';
-import { usuarios as usuariosIniciais } from '@/lib/data';
 import type { Usuario } from '@/lib/types';
 import { getCurrentUser } from '@/lib/auth';
 import { ProtectedRoute } from '@/components/protected-route';
-import { useCreateUsuario } from '@/hooks/use-usuarios';
+import {
+  useUsuarios,
+  useCreateUsuario,
+  useUpdateUsuario,
+  useDeleteUsuario,
+} from '@/hooks/use-usuarios';
 import { toast } from 'sonner';
 
 export default function UsuariosPage() {
-const [usuarios, setUsuarios] = useState<Usuario[]>(usuariosIniciais)
-  const [dialogAberto, setDialogAberto] = useState(false)
-  const [dialogDetalhes, setDialogDetalhes] = useState(false)
-  const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null)
-  const [usuarioDetalhes, setUsuarioDetalhes] = useState<Usuario | null>(null)
-  const [filtro, setFiltro] = useState("")
-  const [tipoFiltro, setTipoFiltro] = useState<string>("todos")
-  const [statusFiltro, setStatusFiltro] = useState<string>("todos")
-  const [usuario, setUsuario] = useState(getCurrentUser())
-const { mutateAsync: createUsuario, isPending } = useCreateUsuario();
+  const { data: usuarios = [], isLoading, error } = useUsuarios();
+  const { mutateAsync: createUsuario, isPending: isCreating } =
+    useCreateUsuario();
+  const { mutateAsync: updateUsuario, isPending: isUpdating } =
+    useUpdateUsuario();
+  const { mutateAsync: deleteUsuario, isPending: isDeleting } =
+    useDeleteUsuario();
+
+  const [dialogAberto, setDialogAberto] = useState(false);
+  const [dialogDetalhes, setDialogDetalhes] = useState(false);
+  const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null);
+  const [usuarioDetalhes, setUsuarioDetalhes] = useState<Usuario | null>(null);
+  const [filtro, setFiltro] = useState('');
+  const [tipoFiltro, setTipoFiltro] = useState<string>('todos');
+  const [statusFiltro, setStatusFiltro] = useState<string>('todos');
+  const [usuario, setUsuario] = useState(getCurrentUser());
   const [formData, setFormData] = useState({
-    nome: "",
-    email: "",
-    tipo: "professor" as Usuario["tipo"],
+    nome: '',
+    email: '',
+    tipo: 'professor' as Usuario['tipo'],
     ativo: true,
-    departamento: "",
-    telefone: "",
-  })
+    departamento: '',
+    telefone: '',
+  });
 
   useEffect(() => {
-    setUsuario(getCurrentUser())
-  }, [])
+    setUsuario(getCurrentUser());
+  }, []);
 
   const resetForm = () => {
     setFormData({
-      nome: "",
-      email: "",
-      tipo: "professor",
+      nome: '',
+      email: '',
+      tipo: 'professor',
       ativo: true,
-      departamento: "",
-      telefone: "",
-    })
-    setUsuarioEditando(null)
-  }
+      departamento: '',
+      telefone: '',
+    });
+    setUsuarioEditando(null);
+  };
 
   const abrirDialog = (usuario?: Usuario) => {
     if (usuario) {
-      setUsuarioEditando(usuario)
+      setUsuarioEditando(usuario);
       setFormData({
         nome: usuario.nome,
         email: usuario.email,
         tipo: usuario.tipo,
         ativo: usuario.ativo,
-        departamento: usuario.departamento || "",
-        telefone: usuario.telefone || "",
-      })
+        departamento: usuario.departamento || '',
+        telefone: usuario.telefone || '',
+      });
     } else {
-      resetForm()
+      resetForm();
     }
-    setDialogAberto(true)
-  }
+    setDialogAberto(true);
+  };
 
   const abrirDetalhes = (usuario: Usuario) => {
-    setUsuarioDetalhes(usuario)
-    setDialogDetalhes(true)
-  }
+    setUsuarioDetalhes(usuario);
+    setDialogDetalhes(true);
+  };
 
-  const salvarUsuario = () => {
-    if (usuarioEditando) {
-      // Editar usuário existente
-      setUsuarios(
-        usuarios.map((u) =>
-          u.id === usuarioEditando.id
-            ? {
-                ...u,
-                nome: formData.nome,
-                email: formData.email,
-                tipo: formData.tipo,
-                ativo: formData.ativo,
-                departamento: formData.departamento,
-                telefone: formData.telefone,
-              }
-            : u
-        )
-      );
-    } else {
-      // Criar novo usuário
-      try {
-        const novoUsuario: Usuario = {
+  const salvarUsuario = async () => {
+    try {
+      if (usuarioEditando) {
+        // Editar usuário existente
+        await updateUsuario({
+          ...usuarioEditando,
+          nome: formData.nome,
+          email: formData.email,
+          tipo: formData.tipo,
+          ativo: formData.ativo,
+          departamento: formData.departamento,
+          telefone: formData.telefone,
+        });
+        toast.success('Usuário atualizado com sucesso!');
+      } else {
+        // Criar novo usuário
+        const novoUsuario: Omit<Usuario, 'id' | 'created_at'> = {
           nome: formData.nome,
           email: formData.email,
           senha: 'senha123', // Em um sistema real, a senha deve ser gerada e armazenada de forma segura
@@ -153,31 +158,40 @@ const { mutateAsync: createUsuario, isPending } = useCreateUsuario();
           telefone: formData.telefone,
           foto: 'https://www.shutterstock.com/pt/image-photo/selfie-influencer-girl-live-streaming-update-2489152413',
         };
-        const response = createUsuario(novoUsuario);
-        // form.reset();
-        toast.success( 'Funcionário criado com sucesso!');
-      } catch (error) {}
+        await createUsuario(novoUsuario);
+        toast.success('Usuário criado com sucesso!');
+      }
+
+      setDialogAberto(false);
+      resetForm();
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao salvar usuário');
     }
-
-    setDialogAberto(false);
-    resetForm();
   };
 
-  const alterarStatus = (id: string | undefined, ativo: boolean) => {
-    setUsuarios(
-      usuarios.map((u) =>
-        u.id === id
-          ? {
-              ...u,
-              ativo,
-            }
-          : u
-      )
-    );
+  const alterarStatus = async (id: string | undefined, ativo: boolean) => {
+    if (!id) return;
+    try {
+      const usuario = usuarios.find((u) => u.id === id);
+      if (!usuario) return;
+
+      await updateUsuario({
+        ...usuario,
+        ativo,
+      });
+      toast.success(`Usuário ${ativo ? 'ativado' : 'desativado'} com sucesso!`);
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao alterar status');
+    }
   };
 
-  const excluirUsuario = (id: string) => {
-    setUsuarios(usuarios.filter((u) => u.id !== id));
+  const excluirUsuario = async (id: string) => {
+    try {
+      await deleteUsuario(id);
+      toast.success('Usuário excluído com sucesso!');
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao excluir usuário');
+    }
   };
 
   const resetarSenha = (id: string | undefined) => {
@@ -234,6 +248,28 @@ const { mutateAsync: createUsuario, isPending } = useCreateUsuario();
   const usuariosAtivos = usuarios.filter((u) => u.ativo).length;
   const professores = usuarios.filter((u) => u.tipo === 'professor').length;
   const suporte = usuarios.filter((u) => u.tipo === 'suporte').length;
+
+  if (isLoading) {
+    return (
+      <ProtectedRoute allowedRoles={['coordenador']}>
+        <div className="flex items-center justify-center h-96">
+          <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </ProtectedRoute>
+    );
+  }
+
+  if (error) {
+    return (
+      <ProtectedRoute allowedRoles={['coordenador']}>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-destructive">
+            Erro ao carregar usuários: {error.message}
+          </p>
+        </div>
+      </ProtectedRoute>
+    );
+  }
 
   return (
     <ProtectedRoute allowedRoles={['coordenador']}>
@@ -364,8 +400,21 @@ const { mutateAsync: createUsuario, isPending } = useCreateUsuario();
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" onClick={salvarUsuario}>
-                  {usuarioEditando ? 'Salvar Alterações' : 'Criar Usuário'}
+                <Button
+                  type="submit"
+                  onClick={salvarUsuario}
+                  disabled={isCreating || isUpdating}
+                >
+                  {isCreating || isUpdating ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      {usuarioEditando ? 'Salvando...' : 'Criando...'}
+                    </>
+                  ) : usuarioEditando ? (
+                    'Salvar Alterações'
+                  ) : (
+                    'Criar Usuário'
+                  )}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -555,8 +604,17 @@ const { mutateAsync: createUsuario, isPending } = useCreateUsuario();
                             className="text-red-600"
                             disabled={usuario.tipo === 'coordenador'}
                           >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Excluir
+                            {isDeleting ? (
+                              <>
+                                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                Excluindo
+                              </>
+                            ) : (
+                              <>
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Excluir
+                              </>
+                            )}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>

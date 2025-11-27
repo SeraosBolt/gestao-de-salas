@@ -424,7 +424,7 @@ export default function AulasPage() {
                 Nova Aula
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingAula ? "Editar Aula" : "Agendar Nova Aula"}</DialogTitle>
                 <DialogDescription>
@@ -706,7 +706,7 @@ export default function AulasPage() {
         </DialogContent>
       </Dialog>
 
-      <Tabs defaultValue="calendario" className="space-y-4">
+      <Tabs defaultValue="calendario" className="">
         <TabsList>
           <TabsTrigger value="calendario" className="gap-2">
             <CalendarDays className="h-4 w-4" />

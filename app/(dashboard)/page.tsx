@@ -17,9 +17,9 @@ export default function DashboardPage() {
 
   if (!usuario) return null
 
-  const salasDisponiveis = salas.filter((s) => s.status === "disponivel").length
-  const salasOcupadas = salas.filter((s) => s.status === "ocupada").length
-  const salasManutencao = salas.filter((s) => s.status === "manutencao").length
+  const salasDisponiveis = salas.filter((s) => s.statusManual === "disponivel").length
+  const salasOcupadas = salas.filter((s) => s.statusManual === "indisponivel").length
+  const salasManutencao = salas.filter((s) => s.statusManual === "manutencao").length
 
   const aulasHoje = aulas.filter((a) => {
     const hoje = new Date().toDateString()
@@ -29,7 +29,10 @@ export default function DashboardPage() {
 
   const chamadosAbertos = chamados.filter((c) => c.status === "aberto" || c.status === "em_andamento").length
 
-  const minhasAulas = usuario.tipo === "professor" ? aulas.filter((a) => a.professorId === usuario.id) : []
+  const minhasAulas =
+    usuario.tipo === "professor" && usuario.id
+      ? aulas.filter((a) => a.professores.some((p) => p.id === usuario.id))
+      : []
 
   // Adicione após as outras variáveis de contagem
   const meusChamados = usuario?.tipo === "suporte" ? chamados.filter((c) => c.responsavelId === usuario.id) : []
@@ -130,10 +133,10 @@ export default function DashboardPage() {
                   </div>
                   <Badge
                     variant={
-                      sala.status === "disponivel" ? "default" : sala.status === "ocupada" ? "secondary" : "destructive"
+                      sala.statusManual === "disponivel" ? "default" : sala.statusManual === "indisponivel" ? "secondary" : "destructive"
                     }
                   >
-                    {sala.status === "disponivel" ? "Disponível" : sala.status === "ocupada" ? "Ocupada" : "Manutenção"}
+                    {sala.statusManual === "disponivel" ? "Disponível" : sala.statusManual === "indisponivel" ? "Indisponível" : "Manutenção"}
                   </Badge>
                 </div>
               ))}
