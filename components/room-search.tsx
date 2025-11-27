@@ -79,7 +79,7 @@ export function RoomSearch({ salas, aulas, onSelectRoom }: RoomSearchProps) {
     horaInicio: string,
     horaFim: string,
   ): { disponivel: boolean; aulaConflito?: Aula; horarioConflito?: HorarioSemanal } => {
-    if (sala.status === "manutencao") {
+    if (sala.statusManual === "manutencao") {
       return { disponivel: false }
     }
 
@@ -153,7 +153,7 @@ export function RoomSearch({ salas, aulas, onSelectRoom }: RoomSearchProps) {
 
         return {
           sala,
-          disponivel: conflitos.length === 0 && sala.status !== "manutencao",
+          disponivel: conflitos.length === 0 && sala.statusManual !== "manutencao",
           conflitos,
           proximosHorariosLivres,
         }

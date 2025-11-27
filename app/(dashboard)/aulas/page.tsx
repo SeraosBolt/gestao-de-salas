@@ -1,12 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Dialog,
   DialogContent,
@@ -16,34 +16,54 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Calendar, Clock, MapPin, List, CalendarDays, Search, AlertCircle, Users, Building } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import {
+  Plus,
+  Calendar,
+  Clock,
+  MapPin,
+  User,
+  BookOpen,
+  AlertTriangle,
+  List,
+  CalendarDays,
+  Search,
+  Pencil,
+  Trash2,
+  CalendarRange,
+} from "lucide-react"
 import { aulas as aulasIniciais, salas, usuarios } from "@/lib/data"
-import type { Aula, HorarioSemanal, ProfessorSalaAssignment } from "@/lib/types"
 import { getCurrentUser } from "@/lib/auth"
+import type { Aula, Usuario, ProfessorSalaAssignment } from "@/lib/types"
 import { CalendarView } from "@/components/calendar-view"
 import { RoomSearch } from "@/components/room-search"
-import { toast } from "sonner"
-
-const CORES_AULAS = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316", "#14b8a6"]
+import { format, parseISO } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { Building } from "lucide-react" // Import the Building component
 
 const DIAS_SEMANA = [
-  { valor: 1, nome: "Segunda", abrev: "Seg" },
-  { valor: 2, nome: "Terça", abrev: "Ter" },
-  { valor: 3, nome: "Quarta", abrev: "Qua" },
-  { valor: 4, nome: "Quinta", abrev: "Qui" },
-  { valor: 5, nome: "Sexta", abrev: "Sex" },
-  { valor: 6, nome: "Sábado", abrev: "Sáb" },
+  { value: 0, label: "Dom", labelFull: "Domingo" },
+  { value: 1, label: "Seg", labelFull: "Segunda-feira" },
+  { value: 2, label: "Ter", labelFull: "Terça-feira" },
+  { value: 3, label: "Qua", labelFull: "Quarta-feira" },
+  { value: 4, label: "Qui", labelFull: "Quinta-feira" },
+  { value: 5, label: "Sex", labelFull: "Sexta-feira" },
+  { value: 6, label: "Sáb", labelFull: "Sábado" },
+]
+
+const CORES_DISPONIVEIS = [
+  "#3b82f6", // blue
+  "#10b981", // emerald
+  "#f59e0b", // amber
+  "#8b5cf6", // violet
+  "#ec4899", // pink
+  "#06b6d4", // cyan
+  "#f97316", // orange
+  "#14b8a6", // teal
+  "#ef4444", // red
+  "#84cc16", // lime
 ]
 
 const timeToMinutes = (time: string): number => {
@@ -52,14 +72,16 @@ const timeToMinutes = (time: string): number => {
 }
 
 export default function AulasPage() {
-  const [aulas, setAulas] = useState<Aula[]>(aulasIniciais)
+  const [aulasList, setAulasList] = useState<Aula[]>(aulasIniciais)
   const [dialogAberto, setDialogAberto] = useState(false)
-  const [alertaConflito, setAlertaConflito] = useState(false)
-  const [conflitos, setConflitos] = useState<
-    { diaSemana: number; aula: Aula; horario: HorarioSemanal; salaId: string }[]
-  >([])
-  const [usuario, setUsuario] = useState(getCurrentUser())
+  const [conflito, setConflito] = useState<string | null>(null)
+  const [usuario, setUsuario] = useState<Usuario | null>(null)
+  const [editingAula, setEditingAula] = useState<Aula | null>(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [aulaToDelete, setAulaToDelete] = useState<Aula | null>(null)
   const [visaoAtual, setVisaoAtual] = useState<"calendario" | "lista" | "buscar">("calendario")
+
+  const professores = usuarios.filter((u) => u.tipo === "professor")
 
   const [formData, setFormData] = useState({
     disciplina: "",
@@ -69,6 +91,8 @@ export default function AulasPage() {
     diasSemana: [] as number[],
     horaInicio: "",
     horaFim: "",
+    dataInicioAnoLetivo: "",
+    dataFimAnoLetivo: "",
   })
 
   useEffect(() => {
@@ -84,7 +108,30 @@ export default function AulasPage() {
       diasSemana: [],
       horaInicio: "",
       horaFim: "",
+      dataInicioAnoLetivo: "",
+      dataFimAnoLetivo: "",
     })
+    setEditingAula(null)
+  }
+
+  const openEditDialog = (aula: Aula) => {
+    setEditingAula(aula)
+    setFormData({
+      disciplina: aula.disciplina,
+      professoresIds: aula.professores.map((p) => p.id),
+      salasIds: aula.salasAtribuicoes?.map((a) => a.salaId) || [aula.salaId],
+      professorSalaAssignments:
+        aula.salasAtribuicoes?.map((a) => ({
+          professorId: a.professorId,
+          salaId: a.salaId,
+        })) || [],
+      diasSemana: aula.horarios.map((h) => h.diaSemana),
+      horaInicio: aula.horarios[0]?.horaInicio || "",
+      horaFim: aula.horarios[0]?.horaFim || "",
+      dataInicioAnoLetivo: aula.dataInicioAnoLetivo || "",
+      dataFimAnoLetivo: aula.dataFimAnoLetivo || "",
+    })
+    setDialogAberto(true)
   }
 
   const toggleDiaSemana = (dia: number) => {
@@ -116,7 +163,6 @@ export default function AulasPage() {
         ? prev.salasIds.filter((id) => id !== salaId)
         : [...prev.salasIds, salaId]
 
-      // Clean up assignments when room is removed
       const newAssignments = prev.professorSalaAssignments.filter((a) => newSalasIds.includes(a.salaId))
 
       return {
@@ -135,14 +181,11 @@ export default function AulasPage() {
 
       if (existingAssignmentIndex >= 0) {
         if (salaId === "") {
-          // Remove assignment
           newAssignments.splice(existingAssignmentIndex, 1)
         } else {
-          // Update assignment
           newAssignments[existingAssignmentIndex] = { professorId, salaId }
         }
       } else if (salaId !== "") {
-        // Add new assignment
         newAssignments.push({ professorId, salaId })
       }
 
@@ -153,113 +196,166 @@ export default function AulasPage() {
     })
   }
 
-  const verificarConflitos = (
-    salasIds: string[],
-    diasSemana: number[],
-    horaInicio: string,
-    horaFim: string,
-  ): { diaSemana: number; aula: Aula; horario: HorarioSemanal; salaId: string }[] => {
-    const conflitosEncontrados: { diaSemana: number; aula: Aula; horario: HorarioSemanal; salaId: string }[] = []
-    const novoInicio = timeToMinutes(horaInicio)
-    const novoFim = timeToMinutes(horaFim)
+  const verificarConflito = (): string | null => {
+    if (formData.diasSemana.length === 0 || !formData.horaInicio || !formData.horaFim) {
+      return null
+    }
 
-    salasIds.forEach((salaId) => {
-      diasSemana.forEach((dia) => {
-        aulas.forEach((aula) => {
-          // Check both legacy salaId and new salasAtribuicoes
-          const aulaSalasIds = aula.salasAtribuicoes ? aula.salasAtribuicoes.map((a) => a.salaId) : [aula.salaId]
+    if (!formData.dataInicioAnoLetivo || !formData.dataFimAnoLetivo) {
+      return null
+    }
 
-          if (!aulaSalasIds.includes(salaId) || aula.status === "cancelada") return
+    const novoInicio = formData.dataInicioAnoLetivo
+    const novoFim = formData.dataFimAnoLetivo
 
-          aula.horarios.forEach((horario) => {
-            if (horario.diaSemana !== dia) return
+    for (const aula of aulasList) {
+      if (editingAula && aula.id === editingAula.id) continue
 
-            const aulaInicio = timeToMinutes(horario.horaInicio)
-            const aulaFim = timeToMinutes(horario.horaFim)
+      // Check if date ranges overlap
+      const aulaInicio = aula.dataInicioAnoLetivo
+      const aulaFim = aula.dataFimAnoLetivo
 
-            if (novoInicio < aulaFim && novoFim > aulaInicio) {
-              conflitosEncontrados.push({ diaSemana: dia, aula, horario, salaId })
+      const datasOverlap = novoInicio <= aulaFim && novoFim >= aulaInicio
+
+      if (!datasOverlap) continue
+
+      for (const dia of formData.diasSemana) {
+        const aulaTemMesmoDia = aula.horarios.some((h) => h.diaSemana === dia)
+
+        if (aulaTemMesmoDia) {
+          const horaInicioNova = Number.parseInt(formData.horaInicio.replace(":", ""))
+          const horaFimNova = Number.parseInt(formData.horaFim.replace(":", ""))
+
+          for (const horario of aula.horarios) {
+            if (horario.diaSemana !== dia) continue
+
+            const horaInicioExistente = Number.parseInt(horario.horaInicio.replace(":", ""))
+            const horaFimExistente = Number.parseInt(horario.horaFim.replace(":", ""))
+
+            const horariosOverlap = horaInicioNova < horaFimExistente && horaFimNova > horaInicioExistente
+
+            if (horariosOverlap) {
+              // Check if any of the selected rooms conflict with existing room assignments
+              const salasExistentes = aula.salasAtribuicoes?.map((a) => a.salaId) || [aula.salaId]
+              const salasConflitantes = formData.salasIds.filter((sId) => salasExistentes.includes(sId))
+
+              if (salasConflitantes.length > 0) {
+                const nomeSalasConflitantes = salasConflitantes
+                  .map((sId) => salas.find((s) => s.id === sId)?.nome)
+                  .join(", ")
+                const diaNome = DIAS_SEMANA.find((d) => d.value === dia)?.labelFull
+                return `Conflito: ${aula.disciplina} já está agendada em ${nomeSalasConflitantes} às ${diaNome} das ${horario.horaInicio} às ${horario.horaFim}`
+              }
             }
-          })
-        })
-      })
-    })
+          }
+        }
+      }
+    }
 
-    return conflitosEncontrados
+    return null
   }
 
-  const salvarAula = () => {
-    const professoresSelecionados = usuarios.filter((u) => formData.professoresIds.includes(u.id))
+  useEffect(() => {
+    const conflito = verificarConflito()
+    setConflito(conflito)
+  }, [
+    formData.diasSemana,
+    formData.horaInicio,
+    formData.horaFim,
+    formData.salasIds,
+    formData.dataInicioAnoLetivo,
+    formData.dataFimAnoLetivo,
+  ])
+
+  const handleSubmit = () => {
+    if (conflito) return
+
+    const professoresSelecionados = professores.filter((p) => formData.professoresIds.includes(p.id))
     const salasSelecionadas = salas.filter((s) => formData.salasIds.includes(s.id))
-
-    if (professoresSelecionados.length === 0 || salasSelecionadas.length === 0 || formData.diasSemana.length === 0) {
-      toast.error("Preencha todos os campos obrigatórios")
-      return
-    }
-
-    if (
-      usuario?.tipo === "coordenador" &&
-      formData.professorSalaAssignments.length !== professoresSelecionados.length
-    ) {
-      toast.error("Atribua uma sala para cada professor")
-      return
-    }
-
-    const conflitosEncontrados = verificarConflitos(
-      formData.salasIds,
-      formData.diasSemana,
-      formData.horaInicio,
-      formData.horaFim,
-    )
-
-    if (conflitosEncontrados.length > 0) {
-      setConflitos(conflitosEncontrados)
-      setAlertaConflito(true)
-      return
-    }
+    const primarySala = salasSelecionadas[0]
 
     const salasAtribuicoes: ProfessorSalaAssignment[] = formData.professorSalaAssignments.map((assignment) => {
-      const professor = professoresSelecionados.find((p) => p.id === assignment.professorId)
-      const sala = salasSelecionadas.find((s) => s.id === assignment.salaId)
+      const prof = professores.find((p) => p.id === assignment.professorId)
+      const sala = salas.find((s) => s.id === assignment.salaId)
       return {
         professorId: assignment.professorId,
-        professorNome: professor?.nome || "",
+        professorNome: prof?.nome || "",
         salaId: assignment.salaId,
         salaNome: sala?.nome || "",
       }
     })
 
-    // For professor creating own class
-    if (usuario?.tipo === "professor" && salasAtribuicoes.length === 0) {
-      const sala = salasSelecionadas[0]
-      salasAtribuicoes.push({
-        professorId: usuario.id,
-        professorNome: usuario.nome,
-        salaId: sala.id,
-        salaNome: sala.nome,
-      })
+    const horarios = formData.diasSemana.map((dia) => ({
+      diaSemana: dia,
+      horaInicio: formData.horaInicio,
+      horaFim: formData.horaFim,
+    }))
+
+    if (editingAula) {
+      // Update existing aula
+      setAulasList((prev) =>
+        prev.map((aula) =>
+          aula.id === editingAula.id
+            ? {
+                ...aula,
+                disciplina: formData.disciplina,
+                professores: professoresSelecionados.map((p) => ({ id: p.id, nome: p.nome })),
+                salaId: primarySala?.id || "",
+                sala: primarySala?.nome || "",
+                salasAtribuicoes,
+                horarios,
+                dataInicioAnoLetivo: formData.dataInicioAnoLetivo,
+                dataFimAnoLetivo: formData.dataFimAnoLetivo,
+              }
+            : aula,
+        ),
+      )
+    } else {
+      // Create new aula
+      const novaAula: Aula = {
+        id: Date.now().toString(),
+        disciplina: formData.disciplina,
+        professores: professoresSelecionados.map((p) => ({ id: p.id, nome: p.nome })),
+        salaId: primarySala?.id || "",
+        sala: primarySala?.nome || "",
+        salasAtribuicoes,
+        horarios,
+        status: "agendada",
+        cor: CORES_DISPONIVEIS[aulasList.length % CORES_DISPONIVEIS.length],
+        dataInicioAnoLetivo: formData.dataInicioAnoLetivo,
+        dataFimAnoLetivo: formData.dataFimAnoLetivo,
+      }
+
+      setAulasList([...aulasList, novaAula])
     }
 
-    const novaAula: Aula = {
-      id: Date.now().toString(),
-      disciplina: formData.disciplina,
-      professores: professoresSelecionados.map((p) => ({ id: p.id, nome: p.nome })),
-      salaId: salasSelecionadas[0].id, // Primary room for backwards compatibility
-      sala: salasSelecionadas[0].nome,
-      salasAtribuicoes,
-      horarios: formData.diasSemana.map((dia) => ({
-        diaSemana: dia,
-        horaInicio: formData.horaInicio,
-        horaFim: formData.horaFim,
-      })),
-      status: "agendada",
-      cor: CORES_AULAS[Math.floor(Math.random() * CORES_AULAS.length)],
-    }
-
-    setAulas([...aulas, novaAula])
     setDialogAberto(false)
     resetForm()
-    toast.success("Aula agendada com sucesso!")
+  }
+
+  const handleDeleteAula = (aula: Aula) => {
+    setAulaToDelete(aula)
+    setDeleteConfirmOpen(true)
+  }
+
+  const confirmDelete = () => {
+    if (aulaToDelete) {
+      setAulasList((prev) => prev.filter((a) => a.id !== aulaToDelete.id))
+      setDeleteConfirmOpen(false)
+      setAulaToDelete(null)
+    }
+  }
+
+  const canEdit = usuario?.tipo === "coordenador"
+
+  const formatDateRange = (dataInicio: string, dataFim: string) => {
+    try {
+      const inicio = parseISO(dataInicio)
+      const fim = parseISO(dataFim)
+      return `${format(inicio, "dd/MM/yyyy", { locale: ptBR })} a ${format(fim, "dd/MM/yyyy", { locale: ptBR })}`
+    } catch {
+      return "Período não definido"
+    }
   }
 
   const handleSlotClick = (diaSemana: number, horaInicio: string, salaId?: string) => {
@@ -273,7 +369,10 @@ export default function AulasPage() {
       salasIds: salaId ? [salaId] : [],
       professorSalaAssignments: [],
       professoresIds: usuario?.tipo === "professor" ? [usuario.id] : [],
+      dataInicioAnoLetivo: "",
+      dataFimAnoLetivo: "",
     })
+    setEditingAula(null)
     setDialogAberto(true)
   }
 
@@ -286,414 +385,440 @@ export default function AulasPage() {
       horaFim,
       professorSalaAssignments: [],
       professoresIds: usuario?.tipo === "professor" ? [usuario.id] : [],
+      dataInicioAnoLetivo: "",
+      dataFimAnoLetivo: "",
     })
+    setEditingAula(null)
     setDialogAberto(true)
   }
 
-  const getDiaNome = (dia: number) => DIAS_SEMANA.find((d) => d.valor === dia)?.nome || ""
-
   const aulasExibidas =
-    usuario?.tipo === "professor" ? aulas.filter((aula) => aula.professores.some((p) => p.id === usuario.id)) : aulas
+    usuario?.tipo === "professor"
+      ? aulasList.filter((aula) => aula.professores.some((p) => p.id === usuario.id))
+      : aulasList
 
-  const professores = usuarios.filter((u) => u.tipo === "professor" && u.ativo)
-  const salasDisponiveis = salas.filter((s) => s.status !== "manutencao")
+  const salasDisponiveis = salas.filter((s) => s.statusManual !== "manutencao")
 
   return (
-    <div className="space-y-6 h-[calc(100vh-8rem)]">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">{usuario?.tipo === "professor" ? "Minhas Aulas" : "Agenda de Aulas"}</h1>
           <p className="text-muted-foreground">
-            {usuario?.tipo === "professor"
-              ? "Gerencie suas aulas e busque salas disponíveis"
-              : "Gerencie as aulas da universidade com horários semanais"}
+            {canEdit
+              ? "Gerencie o agendamento de aulas e visualize a ocupação das salas"
+              : "Visualize e busque salas disponíveis para suas aulas"}
           </p>
         </div>
-
-        <div className="flex items-center gap-3">
-          <div className="flex rounded-lg border bg-muted p-1">
-            <Button
-              variant={visaoAtual === "calendario" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setVisaoAtual("calendario")}
-            >
-              <CalendarDays className="h-4 w-4 mr-2" />
-              Calendário
-            </Button>
-            <Button
-              variant={visaoAtual === "lista" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setVisaoAtual("lista")}
-            >
-              <List className="h-4 w-4 mr-2" />
-              Lista
-            </Button>
-            {usuario?.tipo === "professor" && (
-              <Button
-                variant={visaoAtual === "buscar" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setVisaoAtual("buscar")}
-              >
-                <Search className="h-4 w-4 mr-2" />
-                Buscar Sala
+        {canEdit && (
+          <Dialog
+            open={dialogAberto}
+            onOpenChange={(open) => {
+              setDialogAberto(open)
+              if (!open) resetForm()
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button onClick={resetForm}>
+                <Plus className="mr-2 h-4 w-4" />
+                Nova Aula
               </Button>
-            )}
-          </div>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{editingAula ? "Editar Aula" : "Agendar Nova Aula"}</DialogTitle>
+                <DialogDescription>
+                  {editingAula
+                    ? "Edite as informações da aula selecionada"
+                    : "Preencha as informações para agendar uma nova aula recorrente"}
+                </DialogDescription>
+              </DialogHeader>
 
-          {(usuario?.tipo === "coordenador" || usuario?.tipo === "professor") && (
-            <Dialog open={dialogAberto} onOpenChange={setDialogAberto}>
-              <DialogTrigger asChild>
-                <Button onClick={resetForm}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nova Aula
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Agendar Nova Aula</DialogTitle>
-                  <DialogDescription>Configure os dias, horários e atribua professores às salas.</DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-6 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="disciplina">Disciplina *</Label>
-                    <Input
-                      id="disciplina"
-                      value={formData.disciplina}
-                      onChange={(e) => setFormData({ ...formData, disciplina: e.target.value })}
-                      placeholder="Ex: Programação Web"
-                    />
-                  </div>
+              <div className="grid gap-6 py-4">
+                {/* Disciplina */}
+                <div className="space-y-2">
+                  <Label htmlFor="disciplina">Disciplina *</Label>
+                  <Input
+                    id="disciplina"
+                    value={formData.disciplina}
+                    onChange={(e) => setFormData({ ...formData, disciplina: e.target.value })}
+                    placeholder="Ex: Programação Web"
+                  />
+                </div>
 
-                  {usuario?.tipo === "coordenador" && (
-                    <div className="space-y-3">
-                      <Label>Professores *</Label>
-                      <div className="grid grid-cols-2 gap-3 p-3 border rounded-lg max-h-40 overflow-y-auto">
-                        {professores.map((professor) => (
-                          <div key={professor.id ?? ""} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`prof-${professor.id ?? ""}`}
-                              checked={formData.professoresIds.includes(professor.id ?? "")}
-                              onCheckedChange={() => professor.id && toggleProfessor(professor.id)}
-                            />
-                            <Label htmlFor={`prof-${professor.id ?? ""}`} className="cursor-pointer text-sm">
-                              {professor.nome}
-                            </Label>
-                          </div>
-                        ))}
+                {/* Professores (Multi-select) */}
+                <div className="space-y-2">
+                  <Label>Professores *</Label>
+                  <div className="grid grid-cols-2 gap-2 p-3 border rounded-lg max-h-40 overflow-y-auto">
+                    {professores.map((prof) => (
+                      <div key={prof.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`prof-${prof.id}`}
+                          checked={formData.professoresIds.includes(prof.id)}
+                          onCheckedChange={() => toggleProfessor(prof.id)}
+                        />
+                        <label htmlFor={`prof-${prof.id}`} className="text-sm cursor-pointer">
+                          {prof.nome}
+                        </label>
                       </div>
-                      {formData.professoresIds.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {formData.professoresIds.map((id) => {
-                            const prof = professores.find((p) => p.id === id)
-                            return prof ? (
-                              <Badge key={id} variant="secondary" className="text-xs">
-                                {prof.nome}
-                              </Badge>
-                            ) : null
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="space-y-3">
-                    <Label>Salas * {usuario?.tipo === "coordenador" && "(selecione uma para cada professor)"}</Label>
-                    <div className="grid grid-cols-2 gap-3 p-3 border rounded-lg max-h-40 overflow-y-auto">
-                      {salasDisponiveis.map((sala) => (
-                        <div key={sala.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`sala-${sala.id}`}
-                            checked={formData.salasIds.includes(sala.id)}
-                            onCheckedChange={() => toggleSala(sala.id)}
-                          />
-                          <Label htmlFor={`sala-${sala.id}`} className="cursor-pointer text-sm">
-                            {sala.nome} - {sala.localizacao} (Cap: {sala.capacidade})
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                    {formData.salasIds.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {formData.salasIds.map((id) => {
-                          const sala = salasDisponiveis.find((s) => s.id === id)
-                          return sala ? (
-                            <Badge key={id} variant="outline" className="text-xs">
-                              <Building className="h-3 w-3 mr-1" />
-                              {sala.nome}
-                            </Badge>
-                          ) : null
-                        })}
-                      </div>
-                    )}
+                    ))}
                   </div>
-
-                  {usuario?.tipo === "coordenador" &&
-                    formData.professoresIds.length > 0 &&
-                    formData.salasIds.length > 0 && (
-                      <div className="space-y-3">
-                        <Label>Atribuição Professor → Sala *</Label>
-                        <div className="p-4 border rounded-lg space-y-3 bg-muted/30">
-                          {formData.professoresIds.map((profId) => {
-                            const professor = professores.find((p) => p.id === profId)
-                            const currentAssignment = formData.professorSalaAssignments.find(
-                              (a) => a.professorId === profId,
-                            )
-                            return (
-                              <div key={profId} className="flex items-center gap-4">
-                                <div className="flex items-center gap-2 min-w-[200px]">
-                                  <Users className="h-4 w-4 text-muted-foreground" />
-                                  <span className="text-sm font-medium">{professor?.nome}</span>
-                                </div>
-                                <span className="text-muted-foreground">→</span>
-                                <Select
-                                  value={currentAssignment?.salaId || ""}
-                                  onValueChange={(value) => updateProfessorSalaAssignment(profId, value)}
-                                >
-                                  <SelectTrigger className="w-[250px]">
-                                    <SelectValue placeholder="Selecione a sala" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {formData.salasIds.map((salaId) => {
-                                      const sala = salasDisponiveis.find((s) => s.id === salaId)
-                                      return sala ? (
-                                        <SelectItem key={salaId} value={salaId}>
-                                          {sala.nome} - {sala.localizacao}
-                                        </SelectItem>
-                                      ) : null
-                                    })}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            )
-                          })}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Cada professor deve ser atribuído a uma sala. O mesmo professor pode lecionar em salas
-                          diferentes.
-                        </p>
-                      </div>
-                    )}
-
-                  <div className="space-y-3">
-                    <Label>Dias da Semana *</Label>
-                    <div className="flex flex-wrap gap-4 p-3 border rounded-lg">
-                      {DIAS_SEMANA.map((dia) => (
-                        <div key={dia.valor} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`dia-${dia.valor}`}
-                            checked={formData.diasSemana.includes(dia.valor)}
-                            onCheckedChange={() => toggleDiaSemana(dia.valor)}
-                          />
-                          <Label htmlFor={`dia-${dia.valor}`} className="cursor-pointer">
-                            {dia.nome}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                    {formData.diasSemana.length > 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        Selecionado: {formData.diasSemana.map(getDiaNome).join(", ")}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="horaInicio">Horário de Início *</Label>
-                      <Input
-                        id="horaInicio"
-                        type="time"
-                        value={formData.horaInicio}
-                        onChange={(e) => setFormData({ ...formData, horaInicio: e.target.value })}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="horaFim">Horário de Término *</Label>
-                      <Input
-                        id="horaFim"
-                        type="time"
-                        value={formData.horaFim}
-                        onChange={(e) => setFormData({ ...formData, horaFim: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  {formData.horaInicio && formData.horaFim && (
-                    <div className="p-3 bg-muted rounded-lg">
-                      <p className="text-sm">
-                        <strong>Duração:</strong> {timeToMinutes(formData.horaFim) - timeToMinutes(formData.horaInicio)}{" "}
-                        minutos
-                      </p>
+                  {formData.professoresIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {formData.professoresIds.map((id) => {
+                        const prof = professores.find((p) => p.id === id)
+                        return prof ? (
+                          <Badge key={id} variant="secondary" className="text-xs">
+                            {prof.nome}
+                          </Badge>
+                        ) : null
+                      })}
                     </div>
                   )}
                 </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setDialogAberto(false)}>
-                    Cancelar
-                  </Button>
-                  <Button
-                    onClick={salvarAula}
-                    disabled={
-                      !formData.disciplina ||
-                      formData.salasIds.length === 0 ||
-                      formData.diasSemana.length === 0 ||
-                      !formData.horaInicio ||
-                      !formData.horaFim ||
-                      (usuario?.tipo === "coordenador" && formData.professoresIds.length === 0) ||
-                      (usuario?.tipo === "coordenador" &&
-                        formData.professorSalaAssignments.length !== formData.professoresIds.length)
-                    }
-                  >
-                    Agendar Aula
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          )}
-        </div>
+
+                {/* Salas (Multi-select) */}
+                <div className="space-y-2">
+                  <Label>Salas *</Label>
+                  <div className="grid grid-cols-2 gap-2 p-3 border rounded-lg max-h-40 overflow-y-auto">
+                    {salasDisponiveis.map((sala) => (
+                      <div key={sala.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`sala-${sala.id}`}
+                          checked={formData.salasIds.includes(sala.id)}
+                          onCheckedChange={() => toggleSala(sala.id)}
+                        />
+                        <label htmlFor={`sala-${sala.id}`} className="text-sm cursor-pointer">
+                          {sala.nome} ({sala.capacidade} lugares)
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  {formData.salasIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {formData.salasIds.map((id) => {
+                        const sala = salasDisponiveis.find((s) => s.id === id)
+                        return sala ? (
+                          <Badge key={id} variant="outline" className="text-xs">
+                            <Building className="h-3 w-3 mr-1" />
+                            {sala.nome}
+                          </Badge>
+                        ) : null
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Professor-Sala Assignments */}
+                {formData.professoresIds.length > 0 && formData.salasIds.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Atribuição Professor → Sala *</Label>
+                    <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+                      {formData.professoresIds.map((profId) => {
+                        const prof = professores.find((p) => p.id === profId)
+                        const currentAssignment = formData.professorSalaAssignments.find(
+                          (a) => a.professorId === profId,
+                        )
+
+                        return (
+                          <div key={profId} className="flex items-center gap-3">
+                            <span className="text-sm min-w-[150px]">{prof?.nome}:</span>
+                            <Select
+                              value={currentAssignment?.salaId || ""}
+                              onValueChange={(value) => updateProfessorSalaAssignment(profId, value)}
+                            >
+                              <SelectTrigger className="flex-1">
+                                <SelectValue placeholder="Selecione a sala" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {formData.salasIds.map((salaId) => {
+                                  const sala = salasDisponiveis.find((s) => s.id === salaId)
+                                  return (
+                                    <SelectItem key={salaId} value={salaId}>
+                                      {sala?.nome}
+                                    </SelectItem>
+                                  )
+                                })}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Cada professor deve ser atribuído a uma sala. O mesmo professor pode lecionar em salas diferentes.
+                    </p>
+                  </div>
+                )}
+
+                {/* Dias da Semana */}
+                <div className="space-y-2">
+                  <Label>Dias da Semana *</Label>
+                  <div className="flex flex-wrap gap-2 p-3 border rounded-lg">
+                    {DIAS_SEMANA.slice(1, 7).map((dia) => (
+                      <Button
+                        key={dia.value}
+                        type="button"
+                        variant={formData.diasSemana.includes(dia.value) ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => toggleDiaSemana(dia.value)}
+                      >
+                        {dia.label}
+                      </Button>
+                    ))}
+                  </div>
+                  {formData.diasSemana.length > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      Selecionado:{" "}
+                      {formData.diasSemana.map((d) => DIAS_SEMANA.find((dia) => dia.value === d)?.labelFull).join(", ")}
+                    </p>
+                  )}
+                </div>
+
+                {/* Horário */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="horaInicio">Hora Início *</Label>
+                    <Input
+                      id="horaInicio"
+                      type="time"
+                      value={formData.horaInicio}
+                      onChange={(e) => setFormData({ ...formData, horaInicio: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="horaFim">Hora Fim *</Label>
+                    <Input
+                      id="horaFim"
+                      type="time"
+                      value={formData.horaFim}
+                      onChange={(e) => setFormData({ ...formData, horaFim: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                {formData.horaInicio && formData.horaFim && (
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-sm">
+                      <strong>Duração:</strong> {timeToMinutes(formData.horaFim) - timeToMinutes(formData.horaInicio)}{" "}
+                      minutos
+                    </p>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <CalendarRange className="h-4 w-4 text-muted-foreground" />
+                    <Label className="text-base font-medium">Período do Ano Letivo *</Label>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Defina as datas de início e fim do período em que as aulas serão aplicadas
+                  </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="dataInicioAnoLetivo">Data de Início</Label>
+                      <Input
+                        id="dataInicioAnoLetivo"
+                        type="date"
+                        value={formData.dataInicioAnoLetivo}
+                        onChange={(e) => setFormData({ ...formData, dataInicioAnoLetivo: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="dataFimAnoLetivo">Data de Fim</Label>
+                      <Input
+                        id="dataFimAnoLetivo"
+                        type="date"
+                        value={formData.dataFimAnoLetivo}
+                        onChange={(e) => setFormData({ ...formData, dataFimAnoLetivo: e.target.value })}
+                        min={formData.dataInicioAnoLetivo}
+                      />
+                    </div>
+                  </div>
+                  {formData.dataInicioAnoLetivo && formData.dataFimAnoLetivo && (
+                    <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                      <Calendar className="h-4 w-4 text-primary" />
+                      <span className="text-sm">
+                        Período: {formatDateRange(formData.dataInicioAnoLetivo, formData.dataFimAnoLetivo)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Alerta de Conflito */}
+                {conflito && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>{conflito}</AlertDescription>
+                  </Alert>
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setDialogAberto(false)
+                    resetForm()
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleSubmit}
+                  disabled={
+                    !formData.disciplina ||
+                    formData.professoresIds.length === 0 ||
+                    formData.salasIds.length === 0 ||
+                    formData.diasSemana.length === 0 ||
+                    !formData.horaInicio ||
+                    !formData.horaFim ||
+                    !formData.dataInicioAnoLetivo ||
+                    !formData.dataFimAnoLetivo ||
+                    !!conflito
+                  }
+                >
+                  {editingAula ? "Salvar Alterações" : "Agendar Aula"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
-      {/* Alerta de Conflito */}
-      <AlertDialog open={alertaConflito} onOpenChange={setAlertaConflito}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertCircle className="h-5 w-5" />
-              Conflito de Horário Detectado
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              As salas selecionadas já estão ocupadas nos seguintes horários:
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="space-y-3 my-4">
-            {conflitos.map((conflito, idx) => {
-              const sala = salas.find((s) => s.id === conflito.salaId)
-              return (
-                <Card key={idx} className="border-destructive/50">
-                  <CardContent className="p-4">
-                    <div className="font-medium">{conflito.aula.disciplina}</div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      <Badge variant="outline" className="mr-2">
-                        {sala?.nome}
-                      </Badge>
-                      {getDiaNome(conflito.diaSemana)} • {conflito.horario.horaInicio} - {conflito.horario.horaFim}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {conflito.aula.professores.map((p) => p.nome).join(", ")}
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Fechar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setAlertaConflito(false)
-                setVisaoAtual("buscar")
-              }}
-            >
-              Buscar Outra Sala
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Exclusão</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir a aula "{aulaToDelete?.disciplina}"? Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete}>
+              Excluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* Conteúdo Principal */}
-      <div className="flex-1">
-        {visaoAtual === "calendario" && (
+      <Tabs defaultValue="calendario" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="calendario" className="gap-2">
+            <CalendarDays className="h-4 w-4" />
+            Calendário
+          </TabsTrigger>
+          <TabsTrigger value="lista" className="gap-2">
+            <List className="h-4 w-4" />
+            Lista
+          </TabsTrigger>
+          {usuario?.tipo === "professor" && (
+            <TabsTrigger value="buscar" className="gap-2">
+              <Search className="h-4 w-4" />
+              Buscar Salas
+            </TabsTrigger>
+          )}
+        </TabsList>
+
+        <TabsContent value="calendario">
           <Card className="h-[calc(100vh-14rem)]">
             <CardContent className="p-4 h-full">
-              <CalendarView aulas={aulasExibidas} salas={salas} onSelectSlot={handleSlotClick} />
+              <CalendarView
+                aulas={aulasExibidas}
+                salas={salas}
+                onSelectSlot={handleSlotClick}
+                onEditAula={canEdit ? openEditDialog : undefined}
+              />
             </CardContent>
           </Card>
-        )}
+        </TabsContent>
 
-        {visaoAtual === "lista" && (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {aulasExibidas.map((aula) => (
-              <Card key={aula.id}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: aula.cor || CORES_AULAS[0] }} />
-                      <CardTitle className="text-lg">{aula.disciplina}</CardTitle>
-                    </div>
-                    <Badge variant={aula.status === "agendada" ? "default" : "secondary"}>
-                      {aula.status === "agendada" ? "Ativa" : aula.status}
-                    </Badge>
-                  </div>
-                  <CardDescription className="flex items-center gap-1">
-                    <Users className="h-4 w-4" />
-                    {aula.professores.map((p) => p.nome).join(", ")}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {aula.salasAtribuicoes && aula.salasAtribuicoes.length > 0 ? (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Building className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm font-medium">Atribuições:</span>
-                        </div>
-                        <div className="ml-6 space-y-1">
-                          {aula.salasAtribuicoes.map((attr, idx) => (
-                            <div key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <Badge variant="outline" className="text-xs">
-                                {attr.salaNome}
-                              </Badge>
-                              <span>→</span>
-                              <span>{attr.professorNome}</span>
-                            </div>
-                          ))}
-                        </div>
+        <TabsContent value="lista">
+          <Card>
+            <CardHeader>
+              <CardTitle>Todas as Aulas Agendadas</CardTitle>
+              <CardDescription>Lista completa de aulas com horários recorrentes</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {aulasList.map((aula) => (
+                  <div
+                    key={aula.id}
+                    className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg gap-4"
+                    style={{ borderLeftColor: aula.cor || CORES_DISPONIVEIS[0], borderLeftWidth: "4px" }}
+                  >
+                    <div className="space-y-2 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <BookOpen className="h-4 w-4" />
+                        <span className="font-medium">{aula.disciplina}</span>
+                        <Badge variant="outline">{aula.status}</Badge>
                       </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{aula.sala}</span>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
+                        <User className="h-4 w-4" />
+                        <span>{aula.professores.map((p) => p.nome).join(", ")}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
+                        <MapPin className="h-4 w-4" />
+                        {aula.salasAtribuicoes && aula.salasAtribuicoes.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {aula.salasAtribuicoes.map((attr, idx) => (
+                              <Badge key={idx} variant="secondary" className="text-xs">
+                                {attr.salaNome} ({attr.professorNome.split(" ")[0]})
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          <span>{aula.sala}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
+                        <Calendar className="h-4 w-4" />
+                        <span>
+                          {aula.horarios
+                            .map((h) => `${DIAS_SEMANA.find((d) => d.value === h.diaSemana)?.labelFull}`)
+                            .join(", ")}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Clock className="h-4 w-4" />
+                        <span>
+                          {aula.horarios[0]?.horaInicio} - {aula.horarios[0]?.horaFim}
+                        </span>
+                      </div>
+                      {aula.dataInicioAnoLetivo && aula.dataFimAnoLetivo && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <CalendarRange className="h-4 w-4" />
+                          <span>{formatDateRange(aula.dataInicioAnoLetivo, aula.dataFimAnoLetivo)}</span>
+                        </div>
+                      )}
+                    </div>
+                    {canEdit && (
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => openEditDialog(aula)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleDeleteAula(aula)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                       </div>
                     )}
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">Horários:</span>
-                      </div>
-                      <div className="ml-6 space-y-1">
-                        {aula.horarios.map((horario, idx) => (
-                          <div key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Clock className="h-3 w-3" />
-                            {getDiaNome(horario.diaSemana)}: {horario.horaInicio} - {horario.horaFim}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-            {aulasExibidas.length === 0 && (
-              <Card className="col-span-full">
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Nenhuma aula encontrada</h3>
-                  <p className="text-muted-foreground text-center">
-                    {usuario?.tipo === "professor"
-                      ? "Você ainda não tem aulas agendadas."
-                      : 'Clique em "Nova Aula" para começar a agendar.'}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+        {usuario?.tipo === "professor" && (
+          <TabsContent value="buscar">
+            <RoomSearch aulas={aulasList} salas={salas} onSelectRoom={handleSelectRoomFromSearch} />
+          </TabsContent>
         )}
-
-        {visaoAtual === "buscar" && usuario?.tipo === "professor" && (
-          <RoomSearch aulas={aulas} salas={salas} onSelectRoom={handleSelectRoomFromSearch} />
-        )}
-      </div>
+      </Tabs>
     </div>
   )
 }

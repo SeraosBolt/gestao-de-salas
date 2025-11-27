@@ -15,6 +15,7 @@ interface CalendarViewProps {
   onSelectSlot?: (diaSemana: number, horaInicio: string, salaId?: string) => void
   salaFiltro?: string
   showAllRooms?: boolean
+  onEditAula: any
 }
 
 const HORAS_DIA = Array.from({ length: 17 }, (_, i) => i + 7) // 7:00 às 23:00

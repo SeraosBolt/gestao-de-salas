@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -17,15 +17,32 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Edit, Users, Monitor, MapPin, Search, Building, CheckCircle, AlertTriangle, Wrench } from "lucide-react"
-import { salas as salasIniciais } from "@/lib/data"
-import type { Sala } from "@/lib/types"
+import {
+  Plus,
+  Edit,
+  Users,
+  Monitor,
+  MapPin,
+  Search,
+  Building,
+  CheckCircle,
+  Wrench,
+  Clock,
+  Ban,
+  Calendar,
+} from "lucide-react"
+import { salas as salasIniciais, aulas as aulasIniciais } from "@/lib/data"
+import type { Sala, Aula, StatusSalaCalculado } from "@/lib/types"
 import { getCurrentUser } from "@/lib/auth"
+import { getCurrentRoomStatus, getClassesForRoomOnDay } from "@/lib/room-utils"
 
 export default function SalasPage() {
   const [salas, setSalas] = useState<Sala[]>(salasIniciais)
+  const [aulas] = useState<Aula[]>(aulasIniciais)
   const [dialogAberto, setDialogAberto] = useState(false)
+  const [dialogOcupacaoAberto, setDialogOcupacaoAberto] = useState(false)
   const [salaEditando, setSalaEditando] = useState<Sala | null>(null)
+  const [salaSelecionadaOcupacao, setSalaSelecionadaOcupacao] = useState<Sala | null>(null)
   const [usuario, setUsuario] = useState(getCurrentUser())
 
   const [filtro, setFiltro] = useState("")
@@ -36,7 +53,7 @@ export default function SalasPage() {
     nome: "",
     capacidade: "",
     equipamentos: "",
-    status: "disponivel" as Sala["status"],
+    statusManual: "disponivel" as Sala["statusManual"],
     localizacao: "",
   })
 
@@ -44,12 +61,21 @@ export default function SalasPage() {
     setUsuario(getCurrentUser())
   }, [])
 
+  // Calculate real-time status for all rooms
+  const salasComStatus = useMemo(() => {
+    return salas.map((sala) => ({
+      sala,
+      statusCalculado: getCurrentRoomStatus(sala, aulas),
+      aulasHoje: getClassesForRoomOnDay(sala, aulas, new Date()),
+    }))
+  }, [salas, aulas])
+
   const resetForm = () => {
     setFormData({
       nome: "",
       capacidade: "",
       equipamentos: "",
-      status: "disponivel",
+      statusManual: "disponivel",
       localizacao: "",
     })
     setSalaEditando(null)
@@ -62,13 +88,18 @@ export default function SalasPage() {
         nome: sala.nome,
         capacidade: sala.capacidade.toString(),
         equipamentos: sala.equipamentos.join(", "),
-        status: sala.status,
+        statusManual: sala.statusManual,
         localizacao: sala.localizacao,
       })
     } else {
       resetForm()
     }
     setDialogAberto(true)
+  }
+
+  const abrirDialogOcupacao = (sala: Sala) => {
+    setSalaSelecionadaOcupacao(sala)
+    setDialogOcupacaoAberto(true)
   }
 
   const salvarSala = () => {
@@ -86,7 +117,7 @@ export default function SalasPage() {
                 nome: formData.nome,
                 capacidade: Number.parseInt(formData.capacidade),
                 equipamentos: equipamentosArray,
-                status: formData.status,
+                statusManual: formData.statusManual,
                 localizacao: formData.localizacao,
               }
             : sala,
@@ -98,7 +129,7 @@ export default function SalasPage() {
         nome: formData.nome,
         capacidade: Number.parseInt(formData.capacidade),
         equipamentos: equipamentosArray,
-        status: formData.status,
+        statusManual: formData.statusManual,
         localizacao: formData.localizacao,
       }
       setSalas([...salas, novaSala])
@@ -108,12 +139,14 @@ export default function SalasPage() {
     resetForm()
   }
 
-  const getStatusColor = (status: Sala["status"]) => {
+  const getStatusColor = (status: StatusSalaCalculado) => {
     switch (status) {
       case "disponivel":
         return "default"
       case "ocupada":
         return "secondary"
+      case "indisponivel":
+        return "outline"
       case "manutencao":
         return "destructive"
       default:
@@ -121,12 +154,14 @@ export default function SalasPage() {
     }
   }
 
-  const getStatusText = (status: Sala["status"]) => {
+  const getStatusText = (status: StatusSalaCalculado) => {
     switch (status) {
       case "disponivel":
         return "Disponível"
       case "ocupada":
         return "Ocupada"
+      case "indisponivel":
+        return "Indisponível"
       case "manutencao":
         return "Manutenção"
       default:
@@ -134,36 +169,67 @@ export default function SalasPage() {
     }
   }
 
-  const salasFiltradas = salas.filter((s) => {
+  const getStatusIcon = (status: StatusSalaCalculado) => {
+    switch (status) {
+      case "disponivel":
+        return <CheckCircle className="h-4 w-4" />
+      case "ocupada":
+        return <Clock className="h-4 w-4" />
+      case "indisponivel":
+        return <Ban className="h-4 w-4" />
+      case "manutencao":
+        return <Wrench className="h-4 w-4" />
+      default:
+        return null
+    }
+  }
+
+  const salasFiltradas = salasComStatus.filter(({ sala, statusCalculado }) => {
     const matchFiltro =
       filtro === "" ||
-      s.nome.toLowerCase().includes(filtro.toLowerCase()) ||
-      s.localizacao.toLowerCase().includes(filtro.toLowerCase()) ||
-      s.equipamentos.some((eq) => eq.toLowerCase().includes(filtro.toLowerCase()))
+      sala.nome.toLowerCase().includes(filtro.toLowerCase()) ||
+      sala.localizacao.toLowerCase().includes(filtro.toLowerCase()) ||
+      sala.equipamentos.some((eq) => eq.toLowerCase().includes(filtro.toLowerCase()))
 
-    const matchStatus = statusFiltro === "todos" || s.status === statusFiltro
+    const matchStatus = statusFiltro === "todos" || statusCalculado === statusFiltro
 
     const matchCapacidade =
       capacidadeFiltro === "todos" ||
-      (capacidadeFiltro === "pequena" && s.capacidade <= 30) ||
-      (capacidadeFiltro === "media" && s.capacidade > 30 && s.capacidade <= 60) ||
-      (capacidadeFiltro === "grande" && s.capacidade > 60)
+      (capacidadeFiltro === "pequena" && sala.capacidade <= 30) ||
+      (capacidadeFiltro === "media" && sala.capacidade > 30 && sala.capacidade <= 60) ||
+      (capacidadeFiltro === "grande" && sala.capacidade > 60)
 
     return matchFiltro && matchStatus && matchCapacidade
   })
 
   const totalSalas = salas.length
-  const salasDisponiveis = salas.filter((s) => s.status === "disponivel").length
-  const salasOcupadas = salas.filter((s) => s.status === "ocupada").length
-  const salasManutencao = salas.filter((s) => s.status === "manutencao").length
+  const salasDisponiveis = salasComStatus.filter((s) => s.statusCalculado === "disponivel").length
+  const salasOcupadas = salasComStatus.filter((s) => s.statusCalculado === "ocupada").length
+  const salasManutencao = salasComStatus.filter((s) => s.statusCalculado === "manutencao").length
+  const salasIndisponiveis = salasComStatus.filter((s) => s.statusCalculado === "indisponivel").length
 
-  const RoomCard = ({ sala, showEdit = false }: { sala: Sala; showEdit?: boolean }) => (
+  const DIAS_SEMANA = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"]
+
+  const RoomCard = ({
+    sala,
+    statusCalculado,
+    aulasHoje,
+    showEdit = false,
+  }: {
+    sala: Sala
+    statusCalculado: StatusSalaCalculado
+    aulasHoje: { aula: Aula; horario: { horaInicio: string; horaFim: string } }[]
+    showEdit?: boolean
+  }) => (
     <Card key={sala.id}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg">{sala.nome}</CardTitle>
           <div className="flex items-center gap-2">
-            <Badge variant={getStatusColor(sala.status)}>{getStatusText(sala.status)}</Badge>
+            <Badge variant={getStatusColor(statusCalculado)} className="flex items-center gap-1">
+              {getStatusIcon(statusCalculado)}
+              {getStatusText(statusCalculado)}
+            </Badge>
             {showEdit && (
               <Button variant="ghost" size="sm" onClick={() => abrirDialog(sala)}>
                 <Edit className="h-4 w-4" />
@@ -195,6 +261,41 @@ export default function SalasPage() {
               ))}
             </div>
           </div>
+
+          {/* Show today's classes */}
+          {aulasHoje.length > 0 && (
+            <div className="pt-2 border-t">
+              <div className="flex items-center gap-2 mb-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Aulas Hoje:</span>
+              </div>
+              <div className="space-y-1">
+                {aulasHoje.slice(0, 2).map(({ aula, horario }, idx) => (
+                  <div key={idx} className="text-xs text-muted-foreground flex items-center gap-2">
+                    <Clock className="h-3 w-3" />
+                    <span>
+                      {horario.horaInicio} - {horario.horaFim}:
+                    </span>
+                    <span className="font-medium">{aula.disciplina}</span>
+                  </div>
+                ))}
+                {aulasHoje.length > 2 && (
+                  <Button variant="link" className="h-auto p-0 text-xs" onClick={() => abrirDialogOcupacao(sala)}>
+                    +{aulasHoje.length - 2} mais aulas...
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Manual status indicator */}
+          {sala.statusManual !== "disponivel" && (
+            <div className="pt-2 border-t">
+              <Badge variant="outline" className="text-xs">
+                Status Manual: {sala.statusManual === "indisponivel" ? "Indisponível" : "Manutenção"}
+              </Badge>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -219,6 +320,7 @@ export default function SalasPage() {
           <SelectItem value="todos">Todos os Status</SelectItem>
           <SelectItem value="disponivel">Disponível</SelectItem>
           <SelectItem value="ocupada">Ocupada</SelectItem>
+          <SelectItem value="indisponivel">Indisponível</SelectItem>
           <SelectItem value="manutencao">Manutenção</SelectItem>
         </SelectContent>
       </Select>
@@ -237,7 +339,7 @@ export default function SalasPage() {
   )
 
   const StatsCards = () => (
-    <div className="grid gap-4 md:grid-cols-4">
+    <div className="grid gap-4 md:grid-cols-5">
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center gap-2">
@@ -263,10 +365,21 @@ export default function SalasPage() {
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-orange-500" />
+            <Clock className="h-4 w-4 text-orange-500" />
             <div>
               <p className="text-sm font-medium">Ocupadas</p>
               <p className="text-2xl font-bold text-orange-600">{salasOcupadas}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2">
+            <Ban className="h-4 w-4 text-gray-500" />
+            <div>
+              <p className="text-sm font-medium">Indisponíveis</p>
+              <p className="text-2xl font-bold text-gray-600">{salasIndisponiveis}</p>
             </div>
           </div>
         </CardContent>
@@ -285,6 +398,44 @@ export default function SalasPage() {
     </div>
   )
 
+  // Dialog for viewing room occupation details
+  const OccupationDialog = () => {
+    if (!salaSelecionadaOcupacao) return null
+    const aulasHoje = getClassesForRoomOnDay(salaSelecionadaOcupacao, aulas, new Date())
+
+    return (
+      <Dialog open={dialogOcupacaoAberto} onOpenChange={setDialogOcupacaoAberto}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Ocupação - {salaSelecionadaOcupacao.nome}</DialogTitle>
+            <DialogDescription>Aulas agendadas para hoje ({DIAS_SEMANA[new Date().getDay()]})</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 max-h-[400px] overflow-y-auto">
+            {aulasHoje.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">Nenhuma aula agendada para hoje</p>
+            ) : (
+              aulasHoje.map(({ aula, horario }, idx) => (
+                <Card key={idx}>
+                  <CardContent className="p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium">{aula.disciplina}</span>
+                      <Badge variant="secondary">
+                        {horario.horaInicio} - {horario.horaFim}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Professor(es): {aula.professores.map((p) => p.nome).join(", ")}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
   if (usuario?.tipo !== "coordenador") {
     return (
       <div className="space-y-6">
@@ -297,8 +448,8 @@ export default function SalasPage() {
         <FiltersSection />
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {salasFiltradas.map((sala) => (
-            <RoomCard key={sala.id} sala={sala} />
+          {salasFiltradas.map(({ sala, statusCalculado, aulasHoje }) => (
+            <RoomCard key={sala.id} sala={sala} statusCalculado={statusCalculado} aulasHoje={aulasHoje} />
           ))}
           {salasFiltradas.length === 0 && (
             <Card className="col-span-full">
@@ -310,6 +461,8 @@ export default function SalasPage() {
             </Card>
           )}
         </div>
+
+        <OccupationDialog />
       </div>
     )
   }
@@ -365,20 +518,23 @@ export default function SalasPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="status">Status</Label>
+                <Label htmlFor="status">Status Manual</Label>
                 <Select
-                  value={formData.status}
-                  onValueChange={(value: Sala["status"]) => setFormData({ ...formData, status: value })}
+                  value={formData.statusManual}
+                  onValueChange={(value: Sala["statusManual"]) => setFormData({ ...formData, statusManual: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="disponivel">Disponível</SelectItem>
-                    <SelectItem value="ocupada">Ocupada</SelectItem>
+                    <SelectItem value="indisponivel">Indisponível</SelectItem>
                     <SelectItem value="manutencao">Manutenção</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Status manual sobrepõe o status calculado pelas aulas (exceto para "Disponível")
+                </p>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="equipamentos">Equipamentos</Label>
@@ -403,8 +559,8 @@ export default function SalasPage() {
       <FiltersSection />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {salasFiltradas.map((sala) => (
-          <RoomCard key={sala.id} sala={sala} showEdit />
+        {salasFiltradas.map(({ sala, statusCalculado, aulasHoje }) => (
+          <RoomCard key={sala.id} sala={sala} statusCalculado={statusCalculado} aulasHoje={aulasHoje} showEdit />
         ))}
         {salasFiltradas.length === 0 && (
           <Card className="col-span-full">
@@ -416,6 +572,8 @@ export default function SalasPage() {
           </Card>
         )}
       </div>
+
+      <OccupationDialog />
     </div>
   )
 }

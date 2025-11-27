@@ -1,10 +1,10 @@
-// src/types.ts ou similar
-import { Timestamp } from 'firebase/firestore';
+import { Timestamp } from "firebase/firestore"
 
 export interface ServiceResponse {
   codRet: 0 | 1; // 0 para sucesso, 1 para erro
   msgRet: string;
 }
+
 
 export interface Usuario {
   id?: string;
@@ -21,16 +21,28 @@ export interface Usuario {
   telefone?: string; // Telefone do usuário, se aplicável
 }
 
-
 export interface Sala {
-  id: string;
-  nome: string;
-  capacidade: number;
-  equipamentos: string[];
-  status: "disponivel" | "ocupada" | "manutencao";
-  localizacao: string;
-  created_at?: Timestamp;
-  updated_at?: Timestamp;
+  id: string
+  nome: string
+  capacidade: number
+  equipamentos: string[]
+  statusManual: "disponivel" | "indisponivel" | "manutencao" // Status set by user
+  localizacao: string
+}
+
+export type StatusSalaCalculado = "disponivel" | "ocupada" | "indisponivel" | "manutencao"
+
+export interface HorarioSemanal {
+  diaSemana: number // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
+  horaInicio: string // "19:00"
+  horaFim: string // "21:00"
+}
+
+export interface ProfessorSalaAssignment {
+  professorId: string
+  professorNome: string
+  salaId: string
+  salaNome: string
 }
 
 export interface Aula {
@@ -51,23 +63,23 @@ export interface Aula {
   duracao?: number
   status: "agendada" | "em_andamento" | "concluida" | "cancelada"
   cor?: string
-  periodoInicio?: string
-  periodoFim?: string
+  dataInicioAnoLetivo: string // "2024-02-05"
+  dataFimAnoLetivo: string // "2024-12-15"
 }
 
-export interface HorarioSemanal {
-  diaSemana: number // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
-  horaInicio: string // "19:00"
-  horaFim: string // "21:00"
-}
-
-export interface ProfessorSalaAssignment {
-  professorId: string
-  professorNome: string
+export interface AulaCalendarioItem {
+  id: string
+  aulaId: string
+  disciplina: string
+  professores: { id: string; nome: string }[]
   salaId: string
-  salaNome: string
+  sala: string
+  data: Date
+  horaInicio: string
+  horaFim: string
+  cor?: string
+  status: Aula["status"]
 }
-
 
 export interface Chamado {
   id: string
