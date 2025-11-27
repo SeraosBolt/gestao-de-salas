@@ -16,6 +16,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Plus,
@@ -30,19 +40,30 @@ import {
   Clock,
   Ban,
   Calendar,
+  Trash2,
+  Loader2,
 } from "lucide-react"
-import { salas as salasIniciais, aulas as aulasIniciais } from "@/lib/data"
+import { aulas as aulasIniciais } from "@/lib/data"
 import type { Sala, Aula, StatusSalaCalculado } from "@/lib/types"
 import { getCurrentUser } from "@/lib/auth"
 import { getCurrentRoomStatus, getClassesForRoomOnDay } from "@/lib/room-utils"
+import { useSalas, useCreateSala, useUpdateSala, useDeleteSala } from "@/hooks/use-salas"
+import { useToast } from "@/hooks/use-toast"
 
 export default function SalasPage() {
-  const [salas, setSalas] = useState<Sala[]>(salasIniciais)
+  const { data: salas = [], isLoading } = useSalas()
+  const createSala = useCreateSala()
+  const updateSala = useUpdateSala()
+  const deleteSala = useDeleteSala()
+  const { toast } = useToast()
+  
   const [aulas] = useState<Aula[]>(aulasIniciais)
   const [dialogAberto, setDialogAberto] = useState(false)
   const [dialogOcupacaoAberto, setDialogOcupacaoAberto] = useState(false)
+  const [dialogExcluirAberto, setDialogExcluirAberto] = useState(false)
   const [salaEditando, setSalaEditando] = useState<Sala | null>(null)
   const [salaSelecionadaOcupacao, setSalaSelecionadaOcupacao] = useState<Sala | null>(null)
+  const [salaSelecionadaExcluir, setSalaSelecionadaExcluir] = useState<Sala | null>(null)
   const [usuario, setUsuario] = useState(getCurrentUser())
 
   const [filtro, setFiltro] = useState("")
@@ -102,41 +123,72 @@ export default function SalasPage() {
     setDialogOcupacaoAberto(true)
   }
 
-  const salvarSala = () => {
+  const salvarSala = async () => {
     const equipamentosArray = formData.equipamentos
       .split(",")
       .map((eq) => eq.trim())
       .filter((eq) => eq.length > 0)
 
-    if (salaEditando) {
-      setSalas(
-        salas.map((sala) =>
-          sala.id === salaEditando.id
-            ? {
-                ...sala,
-                nome: formData.nome,
-                capacidade: Number.parseInt(formData.capacidade),
-                equipamentos: equipamentosArray,
-                statusManual: formData.statusManual,
-                localizacao: formData.localizacao,
-              }
-            : sala,
-        ),
-      )
-    } else {
-      const novaSala: Sala = {
-        id: Date.now().toString(),
-        nome: formData.nome,
-        capacidade: Number.parseInt(formData.capacidade),
-        equipamentos: equipamentosArray,
-        statusManual: formData.statusManual,
-        localizacao: formData.localizacao,
-      }
-      setSalas([...salas, novaSala])
+    const salaData = {
+      nome: formData.nome,
+      capacidade: Number.parseInt(formData.capacidade),
+      equipamentos: equipamentosArray,
+      statusManual: formData.statusManual,
+      localizacao: formData.localizacao,
     }
 
-    setDialogAberto(false)
-    resetForm()
+    try {
+      if (salaEditando) {
+        await updateSala.mutateAsync({
+          ...salaData,
+          id: salaEditando.id,
+        })
+        toast({
+          title: "Sucesso!",
+          description: "Sala atualizada com sucesso.",
+        })
+      } else {
+        await createSala.mutateAsync(salaData)
+        toast({
+          title: "Sucesso!",
+          description: "Sala criada com sucesso.",
+        })
+      }
+
+      setDialogAberto(false)
+      resetForm()
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao salvar sala.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const confirmarExclusao = async () => {
+    if (!salaSelecionadaExcluir?.id) return
+
+    try {
+      await deleteSala.mutateAsync(salaSelecionadaExcluir.id)
+      toast({
+        title: "Sucesso!",
+        description: "Sala excluída com sucesso.",
+      })
+      setDialogExcluirAberto(false)
+      setSalaSelecionadaExcluir(null)
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao excluir sala.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const abrirDialogExcluir = (sala: Sala) => {
+    setSalaSelecionadaExcluir(sala)
+    setDialogExcluirAberto(true)
   }
 
   const getStatusColor = (status: StatusSalaCalculado) => {
@@ -231,9 +283,14 @@ export default function SalasPage() {
               {getStatusText(statusCalculado)}
             </Badge>
             {showEdit && (
-              <Button variant="ghost" size="sm" onClick={() => abrirDialog(sala)}>
-                <Edit className="h-4 w-4" />
-              </Button>
+              <>
+                <Button variant="ghost" size="sm" onClick={() => abrirDialog(sala)}>
+                  <Edit className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => abrirDialogExcluir(sala)}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -447,20 +504,26 @@ export default function SalasPage() {
         <StatsCards />
         <FiltersSection />
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {salasFiltradas.map(({ sala, statusCalculado, aulasHoje }) => (
-            <RoomCard key={sala.id} sala={sala} statusCalculado={statusCalculado} aulasHoje={aulasHoje} />
-          ))}
-          {salasFiltradas.length === 0 && (
-            <Card className="col-span-full">
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Building className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">Nenhuma sala encontrada</h3>
-                <p className="text-muted-foreground text-center">Tente ajustar os filtros para encontrar salas.</p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {salasFiltradas.map(({ sala, statusCalculado, aulasHoje }) => (
+              <RoomCard key={sala.id} sala={sala} statusCalculado={statusCalculado} aulasHoje={aulasHoje} />
+            ))}
+            {salasFiltradas.length === 0 && (
+              <Card className="col-span-full">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Building className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-2">Nenhuma sala encontrada</h3>
+                  <p className="text-muted-foreground text-center">Tente ajustar os filtros para encontrar salas.</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
 
         <OccupationDialog />
       </div>
@@ -547,7 +610,14 @@ export default function SalasPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button type="submit" onClick={salvarSala}>
+              <Button 
+                type="submit" 
+                onClick={salvarSala}
+                disabled={createSala.isPending || updateSala.isPending}
+              >
+                {(createSala.isPending || updateSala.isPending) && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 {salaEditando ? "Salvar Alterações" : "Criar Sala"}
               </Button>
             </DialogFooter>
@@ -558,22 +628,52 @@ export default function SalasPage() {
       <StatsCards />
       <FiltersSection />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {salasFiltradas.map(({ sala, statusCalculado, aulasHoje }) => (
-          <RoomCard key={sala.id} sala={sala} statusCalculado={statusCalculado} aulasHoje={aulasHoje} showEdit />
-        ))}
-        {salasFiltradas.length === 0 && (
-          <Card className="col-span-full">
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Building className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">Nenhuma sala encontrada</h3>
-              <p className="text-muted-foreground text-center">Tente ajustar os filtros para encontrar salas.</p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {salasFiltradas.map(({ sala, statusCalculado, aulasHoje }) => (
+            <RoomCard key={sala.id} sala={sala} statusCalculado={statusCalculado} aulasHoje={aulasHoje} showEdit />
+          ))}
+          {salasFiltradas.length === 0 && (
+            <Card className="col-span-full">
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Building className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">Nenhuma sala encontrada</h3>
+                <p className="text-muted-foreground text-center">Tente ajustar os filtros para encontrar salas.</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       <OccupationDialog />
+
+      {/* Dialog de confirmação de exclusão */}
+      <AlertDialog open={dialogExcluirAberto} onOpenChange={setDialogExcluirAberto}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Isso irá excluir permanentemente a sala{" "}
+              <strong>{salaSelecionadaExcluir?.nome}</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmarExclusao}
+              disabled={deleteSala.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteSala.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
