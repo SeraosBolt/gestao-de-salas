@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -185,6 +185,36 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
     horario: HorarioSemanal
   } | null>(null)
   const [salaId, setSalaId] = useState<string>(salaFiltro || "todas")
+  const [horaAtual, setHoraAtual] = useState(new Date())
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  // Atualizar hora atual a cada minuto
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setHoraAtual(new Date())
+    }, 60000) // Atualiza a cada minuto
+
+    return () => clearInterval(timer)
+  }, [])
+
+  // Scroll automático para a hora atual ao carregar
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      const agora = new Date()
+      const horas = agora.getHours()
+      const minutos = agora.getMinutes()
+      
+      // Calcular a posição em pixels (cada hora tem 80px de altura)
+      const pixelsPorMinuto = 80 / 60
+      const offsetDoInicioDoDia = (horas - 7) * 80 + minutos * pixelsPorMinuto
+      
+      // Centralizar a hora atual na viewport
+      const viewportHeight = scrollContainerRef.current.clientHeight
+      const scrollPosition = Math.max(0, offsetDoInicioDoDia - viewportHeight / 2 + 40)
+      
+      scrollContainerRef.current.scrollTop = scrollPosition
+    }
+  }, [])
 
   const diasSemana = useMemo(() => {
     const dias = []
@@ -283,6 +313,25 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
     return aula.sala
   }
 
+  // Calcular posição da linha de hora atual
+  const getPosicaoHoraAtual = () => {
+    const horas = horaAtual.getHours()
+    const minutos = horaAtual.getMinutes()
+    const totalMinutos = horas * 60 + minutos
+    const minutosDesde7AM = totalMinutos - 7 * 60
+    
+    // Cada hora tem 80px de altura
+    const pixelsPorMinuto = 80 / 60
+    return minutosDesde7AM * pixelsPorMinuto
+  }
+
+  const mostrarLinhaHoraAtual = () => {
+    const agora = new Date()
+    const horas = agora.getHours()
+    // Mostrar a linha apenas durante horário de aulas (7h às 23h)
+    return horas >= 7 && horas < 23
+  }
+
   return (
     <div className="flex flex-col h-500">
       {/* Header do Calendário */}
@@ -329,7 +378,7 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
       </div>
 
       {/* Grid do Calendário */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto" ref={scrollContainerRef}>
         <div className="">
           {/* Cabeçalho dos dias */}
           <div
@@ -451,6 +500,26 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
                 )
               })}
             </div>
+
+            {/* Linha da hora atual */}
+            {mostrarLinhaHoraAtual() && (
+              <div
+                className="absolute left-0 right-0 z-20 pointer-events-none"
+                style={{ top: `${getPosicaoHoraAtual()}px` }}
+              >
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 w-[70px] flex justify-end pr-2">
+                    <div className="bg-red-500 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded">
+                      {horaAtual.getHours().toString().padStart(2, "0")}:
+                      {horaAtual.getMinutes().toString().padStart(2, "0")}
+                    </div>
+                  </div>
+                  <div className="flex-1 h-[2px] bg-red-500 shadow-lg relative">
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-2 h-2 bg-red-500 rounded-full shadow-lg" />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

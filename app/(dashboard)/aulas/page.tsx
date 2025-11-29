@@ -33,15 +33,19 @@ import {
   Pencil,
   Trash2,
   CalendarRange,
+  RefreshCw,
 } from "lucide-react"
-import { aulas as aulasIniciais, salas, usuarios } from "@/lib/data"
 import { getCurrentUser } from "@/lib/auth"
 import type { Aula, Usuario, ProfessorSalaAssignment } from "@/lib/types"
 import { CalendarView } from "@/components/calendar-view"
 import { RoomSearch } from "@/components/room-search"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { Building } from "lucide-react" // Import the Building component
+import { Building } from "lucide-react"
+import { useAulas, useCreateAula, useUpdateAula, useDeleteAula } from "@/hooks/use-aulas"
+import { useUsuarios } from "@/hooks/use-usuarios"
+import { useSalas } from "@/hooks/use-salas"
+import { toast } from "sonner"
 
 const DIAS_SEMANA = [
   { value: 0, label: "Dom", labelFull: "Domingo" },
@@ -72,7 +76,13 @@ const timeToMinutes = (time: string): number => {
 }
 
 export default function AulasPage() {
-  const [aulasList, setAulasList] = useState<Aula[]>(aulasIniciais)
+  const { data: aulasList = [], isLoading: isLoadingAulas, error: errorAulas } = useAulas();
+  const { data: usuarios = [], isLoading: isLoadingUsuarios } = useUsuarios();
+  const { data: salas = [], isLoading: isLoadingSalas } = useSalas();
+  const { mutateAsync: createAula, isPending: isCreating } = useCreateAula();
+  const { mutateAsync: updateAula, isPending: isUpdating } = useUpdateAula();
+  const { mutateAsync: deleteAula, isPending: isDeleting } = useDeleteAula();
+  
   const [dialogAberto, setDialogAberto] = useState(false)
   const [conflito, setConflito] = useState<string | null>(null)
   const [usuario, setUsuario] = useState<Usuario | null>(null)
@@ -267,70 +277,69 @@ export default function AulasPage() {
     formData.dataFimAnoLetivo,
   ])
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (conflito) return
 
-    const professoresSelecionados = professores.filter((p) => formData.professoresIds.includes(p.id))
-    const salasSelecionadas = salas.filter((s) => formData.salasIds.includes(s.id))
-    const primarySala = salasSelecionadas[0]
+    try {
+      const professoresSelecionados = professores.filter((p) => formData.professoresIds.includes(p.id))
+      const salasSelecionadas = salas.filter((s) => formData.salasIds.includes(s.id))
+      const primarySala = salasSelecionadas[0]
 
-    const salasAtribuicoes: ProfessorSalaAssignment[] = formData.professorSalaAssignments.map((assignment) => {
-      const prof = professores.find((p) => p.id === assignment.professorId)
-      const sala = salas.find((s) => s.id === assignment.salaId)
-      return {
-        professorId: assignment.professorId,
-        professorNome: prof?.nome || "",
-        salaId: assignment.salaId,
-        salaNome: sala?.nome || "",
+      const salasAtribuicoes: ProfessorSalaAssignment[] = formData.professorSalaAssignments.map((assignment) => {
+        const prof = professores.find((p) => p.id === assignment.professorId)
+        const sala = salas.find((s) => s.id === assignment.salaId)
+        return {
+          professorId: assignment.professorId,
+          professorNome: prof?.nome || "",
+          salaId: assignment.salaId,
+          salaNome: sala?.nome || "",
+        }
+      })
+
+      const horarios = formData.diasSemana.map((dia) => ({
+        diaSemana: dia,
+        horaInicio: formData.horaInicio,
+        horaFim: formData.horaFim,
+      }))
+
+      if (editingAula) {
+        // Update existing aula
+        await updateAula({
+          ...editingAula,
+          disciplina: formData.disciplina,
+          professores: professoresSelecionados.map((p) => ({ id: p.id || '', nome: p.nome })),
+          salaId: primarySala?.id || "",
+          sala: primarySala?.nome || "",
+          salasAtribuicoes,
+          horarios,
+          dataInicioAnoLetivo: formData.dataInicioAnoLetivo,
+          dataFimAnoLetivo: formData.dataFimAnoLetivo,
+        })
+        toast.success('Aula atualizada com sucesso!')
+      } else {
+        // Create new aula
+        const novaAula: Omit<Aula, 'id'> = {
+          disciplina: formData.disciplina,
+          professores: professoresSelecionados.map((p) => ({ id: p.id || '', nome: p.nome })),
+          salaId: primarySala?.id || "",
+          sala: primarySala?.nome || "",
+          salasAtribuicoes,
+          horarios,
+          status: "agendada",
+          cor: CORES_DISPONIVEIS[aulasList.length % CORES_DISPONIVEIS.length],
+          dataInicioAnoLetivo: formData.dataInicioAnoLetivo,
+          dataFimAnoLetivo: formData.dataFimAnoLetivo,
+        }
+
+        await createAula(novaAula)
+        toast.success('Aula criada com sucesso!')
       }
-    })
 
-    const horarios = formData.diasSemana.map((dia) => ({
-      diaSemana: dia,
-      horaInicio: formData.horaInicio,
-      horaFim: formData.horaFim,
-    }))
-
-    if (editingAula) {
-      // Update existing aula
-      setAulasList((prev) =>
-        prev.map((aula) =>
-          aula.id === editingAula.id
-            ? {
-                ...aula,
-                disciplina: formData.disciplina,
-                professores: professoresSelecionados.map((p) => ({ id: p.id, nome: p.nome })),
-                salaId: primarySala?.id || "",
-                sala: primarySala?.nome || "",
-                salasAtribuicoes,
-                horarios,
-                dataInicioAnoLetivo: formData.dataInicioAnoLetivo,
-                dataFimAnoLetivo: formData.dataFimAnoLetivo,
-              }
-            : aula,
-        ),
-      )
-    } else {
-      // Create new aula
-      const novaAula: Aula = {
-        id: Date.now().toString(),
-        disciplina: formData.disciplina,
-        professores: professoresSelecionados.map((p) => ({ id: p.id, nome: p.nome })),
-        salaId: primarySala?.id || "",
-        sala: primarySala?.nome || "",
-        salasAtribuicoes,
-        horarios,
-        status: "agendada",
-        cor: CORES_DISPONIVEIS[aulasList.length % CORES_DISPONIVEIS.length],
-        dataInicioAnoLetivo: formData.dataInicioAnoLetivo,
-        dataFimAnoLetivo: formData.dataFimAnoLetivo,
-      }
-
-      setAulasList([...aulasList, novaAula])
+      setDialogAberto(false)
+      resetForm()
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao salvar aula')
     }
-
-    setDialogAberto(false)
-    resetForm()
   }
 
   const handleDeleteAula = (aula: Aula) => {
@@ -338,11 +347,16 @@ export default function AulasPage() {
     setDeleteConfirmOpen(true)
   }
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (aulaToDelete) {
-      setAulasList((prev) => prev.filter((a) => a.id !== aulaToDelete.id))
-      setDeleteConfirmOpen(false)
-      setAulaToDelete(null)
+      try {
+        await deleteAula(aulaToDelete.id)
+        setDeleteConfirmOpen(false)
+        setAulaToDelete(null)
+        toast.success('Aula excluída com sucesso!')
+      } catch (error: any) {
+        toast.error(error.message || 'Erro ao excluir aula')
+      }
     }
   }
 
@@ -399,6 +413,22 @@ export default function AulasPage() {
 
   const salasDisponiveis = salas.filter((s) => s.statusManual !== "manutencao")
 
+  if (isLoadingAulas || isLoadingUsuarios || isLoadingSalas) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (errorAulas) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <p className="text-destructive">Erro ao carregar aulas: {errorAulas.message}</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -424,8 +454,8 @@ export default function AulasPage() {
                 Nova Aula
               </Button>
             </DialogTrigger>
-            <DialogContent className="overflow-y-auto">
-              <DialogHeader>
+            <DialogContent className="max-h-[90vh] flex flex-col">
+              <DialogHeader className="flex-shrink-0">
                 <DialogTitle>{editingAula ? "Editar Aula" : "Agendar Nova Aula"}</DialogTitle>
                 <DialogDescription>
                   {editingAula
@@ -434,7 +464,7 @@ export default function AulasPage() {
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="grid gap-6 py-4">
+              <div className="grid gap-6 py-4 overflow-y-auto flex-1 pr-2">
                 {/* Disciplina */}
                 <div className="space-y-2">
                   <Label htmlFor="disciplina">Disciplina *</Label>
@@ -654,7 +684,7 @@ export default function AulasPage() {
                 )}
               </div>
 
-              <DialogFooter>
+              <DialogFooter className="flex-shrink-0">
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -675,10 +705,19 @@ export default function AulasPage() {
                     !formData.horaFim ||
                     !formData.dataInicioAnoLetivo ||
                     !formData.dataFimAnoLetivo ||
-                    !!conflito
+                    !!conflito ||
+                    isCreating ||
+                    isUpdating
                   }
                 >
-                  {editingAula ? "Salvar Alterações" : "Agendar Aula"}
+                  {(isCreating || isUpdating) ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      {editingAula ? 'Salvando...' : 'Criando...'}
+                    </>
+                  ) : (
+                    editingAula ? "Salvar Alterações" : "Criar Aula"
+                  )}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -699,8 +738,15 @@ export default function AulasPage() {
             <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={confirmDelete}>
-              Excluir
+            <Button variant="destructive" onClick={confirmDelete} disabled={isDeleting}>
+              {isDeleting ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Excluindo...
+                </>
+              ) : (
+                'Excluir'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -725,7 +771,7 @@ export default function AulasPage() {
         </TabsList>
 
         <TabsContent value="calendario">
-          <Card className="h-[calc(100vh-14rem)]">
+          <Card className="h-[calc(100vh-16rem)]">
             <CardContent className="p-4 h-full">
               <CalendarView
                 aulas={aulasExibidas}
