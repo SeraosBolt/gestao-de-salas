@@ -585,8 +585,14 @@ export default function UsuariosPage() {
                             className={
                               usuario.ativo ? 'text-red-600' : 'text-green-600'
                             }
+                            disabled={isUpdating}
                           >
-                            {usuario.ativo ? (
+                            {isUpdating ? (
+                              <>
+                                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                Processando...
+                              </>
+                            ) : usuario.ativo ? (
                               <>
                                 <XCircle className="h-4 w-4 mr-2" />
                                 Desativar

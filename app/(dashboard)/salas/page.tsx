@@ -422,17 +422,6 @@ export default function SalasPage() {
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-orange-500" />
-            <div>
-              <p className="text-sm font-medium">Ocupadas</p>
-              <p className="text-2xl font-bold text-orange-600">{salasOcupadas}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center gap-2">
             <Ban className="h-4 w-4 text-gray-500" />
             <div>
               <p className="text-sm font-medium">Indisponíveis</p>
@@ -544,14 +533,14 @@ export default function SalasPage() {
               Nova Sala
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
+          <DialogContent className="sm:max-w-[425px] max-h-[90vh] flex flex-col">
+            <DialogHeader className="flex-shrink-0">
               <DialogTitle>{salaEditando ? "Editar Sala" : "Nova Sala"}</DialogTitle>
               <DialogDescription>
                 {salaEditando ? "Edite as informações da sala." : "Adicione uma nova sala ao sistema."}
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-4 py-4 overflow-y-auto flex-1 p-2">
               <div className="grid gap-2">
                 <Label htmlFor="nome">Nome da Sala</Label>
                 <Input
@@ -609,7 +598,7 @@ export default function SalasPage() {
                 />
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="flex-shrink-0">
               <Button 
                 type="submit" 
                 onClick={salvarSala}

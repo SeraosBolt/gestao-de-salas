@@ -204,9 +204,9 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
       const horas = agora.getHours()
       const minutos = agora.getMinutes()
       
-      // Calcular a posição em pixels (cada hora tem 80px de altura)
-      const pixelsPorMinuto = 80 / 60
-      const offsetDoInicioDoDia = (horas - 7) * 80 + minutos * pixelsPorMinuto
+      // Usar 64px para mobile (h-16) - será mais preciso que tentar detectar breakpoint
+      const pixelsPorMinuto = 64 / 60
+      const offsetDoInicioDoDia = (horas - 7) * 64 + minutos * pixelsPorMinuto
       
       // Centralizar a hora atual na viewport
       const viewportHeight = scrollContainerRef.current.clientHeight
@@ -232,6 +232,7 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
 
   const aulasFiltradas = useMemo(() => {
     let filtered = aulas.filter((a) => a.status !== "cancelada")
+    
     if (salaId !== "todas") {
       filtered = filtered.filter((a) => {
         if (a.salasAtribuicoes && a.salasAtribuicoes.length > 0) {
@@ -243,10 +244,26 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
     return filtered
   }, [aulas, salaId])
 
-  const getAulasParaDiaSemana = (diaSemana: number): AulaComPosicao[] => {
+  const getAulasParaDiaSemana = (diaSemana: number, dataAtual?: Date): AulaComPosicao[] => {
     const aulasNoDia: { aula: Aula; horario: HorarioSemanal }[] = []
 
+    // Se uma data foi fornecida, validar o período letivo para essa data específica
+    let dataParaValidar: string | null = null
+    if (dataAtual) {
+      const ano = dataAtual.getFullYear()
+      const mes = String(dataAtual.getMonth() + 1).padStart(2, '0')
+      const dia = String(dataAtual.getDate()).padStart(2, '0')
+      dataParaValidar = `${ano}-${mes}-${dia}`
+    }
+
     aulasFiltradas.forEach((aula) => {
+      // Validar se a aula está dentro do período letivo para a data específica
+      if (dataParaValidar && aula.dataInicioAnoLetivo && aula.dataFimAnoLetivo) {
+        if (dataParaValidar < aula.dataInicioAnoLetivo || dataParaValidar > aula.dataFimAnoLetivo) {
+          return // Pular esta aula se estiver fora do período letivo
+        }
+      }
+      
       aula.horarios.forEach((horario) => {
         if (horario.diaSemana === diaSemana) {
           aulasNoDia.push({ aula, horario })
@@ -262,8 +279,12 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
     const fimMinutos = timeToMinutes(horario.horaFim)
     const duracao = fimMinutos - inicioMinutos
 
-    const topOffset = (inicioMinutos - 7 * 60) * (80 / 60)
-    const height = duracao * (80 / 60)
+    // Usar 64px para mobile (h-16) e 80px para desktop (sm:h-20)
+    // Como não podemos detectar a largura da tela aqui, usamos CSS calc() com variáveis CSS
+    // Vamos calcular baseado em 64px (mobile) e ajustar via CSS
+    const pixelsPorHoraMobile = 64
+    const topOffset = (inicioMinutos - 7 * 60) * (pixelsPorHoraMobile / 60)
+    const height = duracao * (pixelsPorHoraMobile / 60)
 
     // Calcular largura e posição horizontal
     const larguraPorcentagem = 100 / totalColunas
@@ -320,8 +341,8 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
     const totalMinutos = horas * 60 + minutos
     const minutosDesde7AM = totalMinutos - 7 * 60
     
-    // Cada hora tem 80px de altura
-    const pixelsPorMinuto = 80 / 60
+    // Usar 64px para mobile (h-16)
+    const pixelsPorMinuto = 64 / 60
     return minutosDesde7AM * pixelsPorMinuto
   }
 
@@ -333,27 +354,27 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
   }
 
   return (
-    <div className="flex flex-col h-500">
+    <div className="flex flex-col h-full w-full overflow-hidden">
       {/* Header do Calendário */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 pb-4 border-b">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4 mb-2 sm:mb-4 pb-2 sm:pb-4 border-b flex-shrink-0 px-1">
+        <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={() => navegarSemana(-1)}>
+            <Button variant="outline" size="icon" className="h-8 w-8 sm:h-10 sm:w-10" onClick={() => navegarSemana(-1)}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon" onClick={() => navegarSemana(1)}>
+            <Button variant="outline" size="icon" className="h-8 w-8 sm:h-10 sm:w-10" onClick={() => navegarSemana(1)}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-          <h2 className="text-xl font-semibold capitalize">{formatarMes()}</h2>
-          <Button variant="outline" size="sm" onClick={() => setDataSelecionada(new Date())}>
+          <h2 className="text-base sm:text-xl font-semibold capitalize">{formatarMes()}</h2>
+          <Button variant="outline" size="sm" className="h-8 text-xs sm:text-sm" onClick={() => setDataSelecionada(new Date())}>
             Hoje
           </Button>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <Select value={salaId} onValueChange={setSalaId}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px] h-8 sm:h-10 text-xs sm:text-sm">
               <SelectValue placeholder="Filtrar por sala" />
             </SelectTrigger>
             <SelectContent>
@@ -367,10 +388,10 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
           </Select>
 
           <div className="flex rounded-lg border bg-muted p-1">
-            <Button variant={visao === "semana" ? "default" : "ghost"} size="sm" onClick={() => setVisao("semana")}>
+            <Button variant={visao === "semana" ? "default" : "ghost"} size="sm" className="h-7 px-2 sm:px-3 text-xs" onClick={() => setVisao("semana")}>
               Semana
             </Button>
-            <Button variant={visao === "dia" ? "default" : "ghost"} size="sm" onClick={() => setVisao("dia")}>
+            <Button variant={visao === "dia" ? "default" : "ghost"} size="sm" className="h-7 px-2 sm:px-3 text-xs" onClick={() => setVisao("dia")}>
               Dia
             </Button>
           </div>
@@ -378,14 +399,14 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
       </div>
 
       {/* Grid do Calendário */}
-      <div className="flex-1 overflow-auto" ref={scrollContainerRef}>
-        <div className="">
+      <div className="flex-1 overflow-auto w-full" ref={scrollContainerRef}>
+        <div className="min-w-full">
           {/* Cabeçalho dos dias */}
           <div
-            className="grid border-b sticky top-0 bg-background z-10"
-            style={{ gridTemplateColumns: "70px repeat(7, 1fr)" }}
+            className="grid border-b sticky top-0 w-max bg-background z-10"
+            style={{ gridTemplateColumns: "50px repeat(7, minmax(80px, 1fr))" }}
           >
-            <div className="p-2 text-center text-xs font-medium text-muted-foreground border-r bg-muted/30">
+            <div className="p-1 sm:p-2 text-center text-[10px] sm:text-xs font-medium text-muted-foreground border-r bg-muted/30">
               Horário
             </div>
             {(visao === "semana" ? diasSemana : [dataSelecionada]).map((dia, index) => {
@@ -393,16 +414,16 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
               return (
                 <div
                   key={index}
-                  className={cn("p-3 text-center border-r last:border-r-0", isHoje(dia) && "bg-primary/5")}
+                  className={cn("p-1 sm:p-3 text-center border-r last:border-r-0", isHoje(dia) && "bg-primary/5")}
                 >
-                  <div className="text-xs font-medium text-muted-foreground uppercase">
+                  <div className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase">
                     {DIAS_SEMANA[diaSemanaIndex].abrev}
                   </div>
                   <div
                     className={cn(
-                      "text-lg font-semibold mt-1",
+                      "text-sm sm:text-lg font-semibold mt-1",
                       isHoje(dia) &&
-                        "bg-primary text-primary-foreground rounded-full w-8 h-8 flex items-center justify-center mx-auto",
+                        "bg-primary text-primary-foreground rounded-full w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center mx-auto text-xs sm:text-base",
                     )}
                   >
                     {dia.getDate()}
@@ -414,12 +435,12 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
 
           {/* Grid de horários */}
           <div className="relative">
-            <div className="grid" style={{ gridTemplateColumns: "70px repeat(7, 1fr)" }}>
+            <div className="grid" style={{ gridTemplateColumns: "50px repeat(7, minmax(80px, 1fr))" }}>
               {/* Coluna de horas */}
               <div className="border-r bg-muted/30">
                 {HORAS_DIA.map((hora) => (
-                  <div key={hora} className="h-20 border-b flex items-start justify-end pr-2 pt-1">
-                    <span className="text-xs font-medium text-muted-foreground">
+                  <div key={hora} className="h-16 sm:h-20 border-b flex items-start justify-end pr-1 sm:pr-2 pt-1">
+                    <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">
                       {hora.toString().padStart(2, "0")}:00
                     </span>
                   </div>
@@ -429,7 +450,8 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
               {/* Colunas dos dias */}
               {(visao === "semana" ? DIAS_SEMANA : [DIAS_SEMANA[dataSelecionada.getDay()]]).map((dia, diaIndex) => {
                 const diaSemanaIndex = visao === "semana" ? dia.valor : dataSelecionada.getDay()
-                const aulasNoDia = getAulasParaDiaSemana(diaSemanaIndex)
+                const dataAtual = visao === "semana" ? diasSemana[diaIndex] : dataSelecionada
+                const aulasNoDia = getAulasParaDiaSemana(diaSemanaIndex, dataAtual)
 
                 return (
                   <div
@@ -446,10 +468,10 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
                     {HORAS_DIA.map((hora) => (
                       <div
                         key={hora}
-                        className="h-20 border-b hover:bg-muted/50 cursor-pointer transition-colors border-dashed"
+                        className="h-16 sm:h-20 border-b hover:bg-muted/50 cursor-pointer transition-colors border-dashed"
                         onClick={() => handleSlotClick(diaSemanaIndex, hora)}
                       >
-                        <div className="h-10 border-b border-dashed border-muted-foreground/20" />
+                        <div className="h-8 sm:h-10 border-b border-dashed border-muted-foreground/20" />
                       </div>
                     ))}
 
@@ -461,7 +483,7 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
                       return (
                         <div
                           key={`${aula.id}-${horario.diaSemana}-${horario.horaInicio}-${idx}`}
-                          className="absolute rounded-lg px-2 py-1.5 cursor-pointer overflow-hidden shadow-md hover:shadow-lg transition-all hover:z-10 border border-white/20"
+                          className="absolute rounded-lg px-1 sm:px-2 py-1 sm:py-1.5 cursor-pointer overflow-hidden shadow-md hover:shadow-lg transition-all hover:z-10 border border-white/20"
                           style={{
                             ...style,
                             backgroundColor: aula.cor || CORES_AULAS[Number.parseInt(aula.id) % CORES_AULAS.length],
@@ -471,15 +493,15 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
                             setAulaDetalhes({ aula, horario })
                           }}
                         >
-                          <div className="text-white text-xs font-semibold truncate">{aula.disciplina}</div>
+                          <div className="text-white text-[10px] sm:text-xs font-semibold truncate">{aula.disciplina}</div>
                           {duracao >= 60 && totalColunas <= 2 && (
-                            <div className="text-white/90 text-[11px] truncate mt-0.5 flex items-center gap-1">
-                              <Building className="h-3 w-3 flex-shrink-0" />
+                            <div className="text-white/90 text-[9px] sm:text-[11px] truncate mt-0.5 flex items-center gap-1">
+                              <Building className="h-2 w-2 sm:h-3 sm:w-3 flex-shrink-0" />
                               <span className="truncate">{displayInfo}</span>
                             </div>
                           )}
                           {duracao >= 90 && (
-                            <div className="text-white/80 text-[10px] truncate">
+                            <div className="text-white/80 text-[9px] sm:text-[10px] truncate">
                               {horario.horaInicio} - {horario.horaFim}
                             </div>
                           )}
@@ -526,8 +548,8 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
 
       {/* Dialog de detalhes da aula */}
       <Dialog open={!!aulaDetalhes} onOpenChange={() => setAulaDetalhes(null)}>
-        <DialogContent className="max-h-[80vh] w-full max-w-md">
-          <DialogHeader>
+        <DialogContent className="max-h-[90vh] w-full max-w-md flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <div
                 className="w-3 h-3 rounded-full"
@@ -538,7 +560,7 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
             <DialogDescription>Detalhes da aula agendada</DialogDescription>
           </DialogHeader>
           {aulaDetalhes && (
-            <div className="space-y-4 pt-4 overflow-y-scroll">
+            <div className="space-y-4 pt-4 overflow-y-auto flex-1 pr-2">
               {aulaDetalhes.aula.salasAtribuicoes && aulaDetalhes.aula.salasAtribuicoes.length > 0 ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">

@@ -46,12 +46,12 @@ export default function DashboardLayout({
     <ProtectedRoute>
       <SidebarProvider>
         <AppSidebar />
-        <SidebarInset>
+        <SidebarInset className="overflow-x-hidden">
           <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 h-4" />
           </header>
-          <main className="flex-1 p-4">{children}</main>
+          <main className="flex-1 p-2 sm:p-4 overflow-x-hidden">{children}</main>
         </SidebarInset>
       </SidebarProvider>
     </ProtectedRoute>

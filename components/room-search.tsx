@@ -20,6 +20,7 @@ interface RoomSearchProps {
 }
 
 const DIAS_SEMANA = [
+  {valor: 0, nome: "Domingo" },
   { valor: 1, nome: "Segunda" },
   { valor: 2, nome: "Terça" },
   { valor: 3, nome: "Quarta" },
@@ -86,8 +87,30 @@ export function RoomSearch({ salas, aulas, onSelectRoom }: RoomSearchProps) {
     const novoInicio = timeToMinutes(horaInicio)
     const novoFim = timeToMinutes(horaFim)
 
+    // Data atual para verificar o período letivo
+    const hoje = new Date()
+    const ano = hoje.getFullYear()
+    const mes = String(hoje.getMonth() + 1).padStart(2, '0')
+    const dia = String(hoje.getDate()).padStart(2, '0')
+    const dataAtual = `${ano}-${mes}-${dia}`
+
     for (const aula of aulas) {
-      if (aula.salaId !== sala.id || aula.status === "cancelada") continue
+      if (aula.status === "cancelada") continue
+
+      // Verificar se a aula está dentro do período letivo na data atual
+      if (aula.dataInicioAnoLetivo && aula.dataFimAnoLetivo) {
+        if (dataAtual < aula.dataInicioAnoLetivo || dataAtual > aula.dataFimAnoLetivo) {
+          // Aula fora do período letivo, não causa conflito
+          continue
+        }
+      }
+
+      // Verificar se a aula usa esta sala (considerando salasAtribuicoes ou salaId)
+      const usaEstaSala = aula.salasAtribuicoes && aula.salasAtribuicoes.length > 0
+        ? aula.salasAtribuicoes.some(attr => attr.salaId === sala.id)
+        : aula.salaId === sala.id
+
+      if (!usaEstaSala) continue
 
       for (const horario of aula.horarios) {
         if (horario.diaSemana !== diaSemana) continue
@@ -354,12 +377,6 @@ export function RoomSearch({ salas, aulas, onSelectRoom }: RoomSearchProps) {
                     </div>
                   )}
 
-                  {disponivel && onSelectRoom && (
-                    <Button className="w-full" onClick={() => handleSelectRoom(sala.id)}>
-                      <Calendar className="h-4 w-4 mr-2" />
-                      Reservar esta Sala
-                    </Button>
-                  )}
                 </CardContent>
               </Card>
             ))}

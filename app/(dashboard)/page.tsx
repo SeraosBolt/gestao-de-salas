@@ -3,17 +3,32 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Users, BookOpen, Headphones, AlertTriangle } from "lucide-react"
+import { Users, BookOpen, Headphones, AlertTriangle, RefreshCw } from "lucide-react"
 import { getCurrentUser } from "@/lib/auth"
-import { salas, aulas, chamados } from "@/lib/data"
 import type { Usuario } from "@/lib/types"
+import { useSalas } from "@/hooks/use-salas"
+import { useAulas } from "@/hooks/use-aulas"
+import { useChamados } from "@/hooks/use-chamados"
 
 export default function DashboardPage() {
   const [usuario, setUsuario] = useState<Usuario | null>(null)
+  const { data: salas = [], isLoading: isLoadingSalas } = useSalas()
+  const { data: aulas = [], isLoading: isLoadingAulas } = useAulas()
+  const { data: chamados = [], isLoading: isLoadingChamados } = useChamados()
 
   useEffect(() => {
     setUsuario(getCurrentUser())
   }, [])
+
+  const isLoading = isLoadingSalas || isLoadingAulas || isLoadingChamados
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   if (!usuario) return null
 
@@ -21,11 +36,29 @@ export default function DashboardPage() {
   const salasOcupadas = salas.filter((s) => s.statusManual === "indisponivel").length
   const salasManutencao = salas.filter((s) => s.statusManual === "manutencao").length
 
-  const aulasHoje = aulas.filter((a) => {
-    const hoje = new Date().toDateString()
-    const aulaData = new Date(a.dataHora).toDateString()
-    return hoje === aulaData
-  }).length
+  // Contar aulas de hoje com base nos horários semanais e período letivo
+  const hoje = new Date()
+  const diaSemanaHoje = hoje.getDay()
+  // Garantir que a data seja no formato local (sem conversão de timezone)
+  const ano = hoje.getFullYear()
+  const mes = String(hoje.getMonth() + 1).padStart(2, '0')
+  const dia = String(hoje.getDate()).padStart(2, '0')
+  const dataHoje = `${ano}-${mes}-${dia}`
+
+  // Contar cada ocorrência de aula hoje (uma aula pode ter múltiplos horários no mesmo dia)
+  const aulasHoje = aulas.reduce((total, aula) => {
+    // Verificar se hoje está dentro do período letivo
+    if (aula.dataInicioAnoLetivo && aula.dataFimAnoLetivo) {
+      // Comparar strings de data no formato ISO (YYYY-MM-DD)
+      if (dataHoje < aula.dataInicioAnoLetivo || dataHoje > aula.dataFimAnoLetivo) {
+        return total // Hoje não está no período letivo desta aula
+      }
+    }
+    
+    // Contar quantos horários desta aula acontecem hoje
+    const horariosHoje = aula.horarios.filter((h) => h.diaSemana === diaSemanaHoje).length
+    return total + horariosHoje
+  }, 0)
 
   const chamadosAbertos = chamados.filter((c) => c.status === "aberto" || c.status === "em_andamento").length
 
@@ -34,7 +67,17 @@ export default function DashboardPage() {
       ? aulas.filter((a) => a.professores.some((p) => p.id === usuario.id))
       : []
 
-  // Adicione após as outras variáveis de contagem
+  // Próximas aulas do professor hoje
+  const minhasAulasHoje = minhasAulas.filter((a) => {
+    if (a.dataInicioAnoLetivo && a.dataFimAnoLetivo) {
+      // Usar a mesma lógica de comparação de datas
+      if (dataHoje < a.dataInicioAnoLetivo || dataHoje > a.dataFimAnoLetivo) {
+        return false
+      }
+    }
+    return a.horarios.some((h) => h.diaSemana === diaSemanaHoje)
+  })
+
   const meusChamados = usuario?.tipo === "suporte" ? chamados.filter((c) => c.responsavelId === usuario.id) : []
   const chamadosNaoAtribuidos = chamados.filter((c) => !c.responsavelId && c.status === "aberto")
 
@@ -148,27 +191,34 @@ export default function DashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle>Minhas Próximas Aulas</CardTitle>
-              <CardDescription>Suas aulas agendadas</CardDescription>
+              <CardDescription>Suas aulas agendadas para hoje</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {minhasAulas.slice(0, 3).map((aula) => (
-                  <div key={aula.id} className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">{aula.disciplina}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {aula.sala} - {new Date(aula.dataHora).toLocaleString("pt-BR")}
-                      </p>
-                    </div>
-                    <Badge variant="outline">
-                      {aula.status === "agendada"
-                        ? "Agendada"
-                        : aula.status === "em_andamento"
-                          ? "Em Andamento"
-                          : "Concluída"}
-                    </Badge>
-                  </div>
-                ))}
+                {minhasAulasHoje.length > 0 ? (
+                  minhasAulasHoje.slice(0, 3).map((aula) => {
+                    const horarioHoje = aula.horarios.find((h) => h.diaSemana === diaSemanaHoje)
+                    return (
+                      <div key={aula.id} className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{aula.disciplina}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {aula.sala} - {horarioHoje?.horaInicio} às {horarioHoje?.horaFim}
+                          </p>
+                        </div>
+                        <Badge variant="outline">
+                          {aula.status === "agendada"
+                            ? "Agendada"
+                            : aula.status === "em_andamento"
+                              ? "Em Andamento"
+                              : "Concluída"}
+                        </Badge>
+                      </div>
+                    )
+                  })
+                ) : (
+                  <p className="text-sm text-muted-foreground">Nenhuma aula agendada para hoje.</p>
+                )}
               </div>
             </CardContent>
           </Card>

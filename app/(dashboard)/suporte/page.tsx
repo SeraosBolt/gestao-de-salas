@@ -42,7 +42,6 @@ import {
   MessageSquare,
   Filter,
 } from 'lucide-react';
-import { salas } from '@/lib/data';
 import type { Chamado } from '@/lib/types';
 import { getCurrentUser } from '@/lib/auth';
 import {
@@ -52,12 +51,14 @@ import {
   useDeleteChamado,
 } from '@/hooks/use-chamados';
 import { useUsuarios } from '@/hooks/use-usuarios';
+import { useSalas } from '@/hooks/use-salas';
 import { toast } from 'sonner';
 import { RefreshCw } from 'lucide-react';
 
 export default function SuportePage() {
   const { data: chamados = [], isLoading, error } = useChamados();
   const { data: usuarios = [], isLoading: isLoadingUsuarios } = useUsuarios();
+  const { data: salas = [], isLoading: isLoadingSalas } = useSalas();
   const { mutateAsync: createChamado, isPending: isCreating } =
     useCreateChamado();
   const { mutateAsync: updateChamado, isPending: isUpdating } =
@@ -290,7 +291,7 @@ export default function SuportePage() {
 
   const usuariosSuporte = usuarios.filter((u) => u.tipo === 'suporte');
 
-  if (isLoading || isLoadingUsuarios) {
+  if (isLoading || isLoadingUsuarios || isLoadingSalas) {
     return (
       <div className="flex items-center justify-center h-96">
         <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -391,8 +392,10 @@ export default function SuportePage() {
                     size="sm"
                     variant="outline"
                     onClick={() => atualizarStatus(chamado.id, 'em_andamento')}
+                    disabled={isUpdating}
                   >
-                    Iniciar Atendimento
+                    {isUpdating && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
+                    {isUpdating ? 'Processando...' : 'Iniciar Atendimento'}
                   </Button>
                 )}
 
@@ -400,9 +403,14 @@ export default function SuportePage() {
                   <Button
                     size="sm"
                     onClick={() => atualizarStatus(chamado.id, 'resolvido')}
+                    disabled={isUpdating}
                   >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Marcar como Resolvido
+                    {isUpdating ? (
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                    )}
+                    {isUpdating ? 'Resolvendo...' : 'Marcar como Resolvido'}
                   </Button>
                 )}
 
@@ -411,8 +419,10 @@ export default function SuportePage() {
                     size="sm"
                     variant="outline"
                     onClick={() => atualizarStatus(chamado.id, 'fechado')}
+                    disabled={isUpdating}
                   >
-                    Fechar Chamado
+                    {isUpdating && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
+                    {isUpdating ? 'Fechando...' : 'Fechar Chamado'}
                   </Button>
                 )}
               </>
@@ -425,9 +435,14 @@ export default function SuportePage() {
                   <Button
                     size="sm"
                     onClick={() => atribuirChamado(chamado.id, usuario.id)}
+                    disabled={isUpdating}
                   >
-                    <UserCheck className="h-4 w-4 mr-2" />
-                    Assumir Chamado
+                    {isUpdating ? (
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <UserCheck className="h-4 w-4 mr-2" />
+                    )}
+                    {isUpdating ? 'Atribuindo...' : 'Assumir Chamado'}
                   </Button>
                 )}
 
@@ -439,8 +454,10 @@ export default function SuportePage() {
                       onClick={() =>
                         atualizarStatus(chamado.id, 'em_andamento')
                       }
+                      disabled={isUpdating}
                     >
-                      Iniciar Atendimento
+                      {isUpdating && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
+                      {isUpdating ? 'Processando...' : 'Iniciar Atendimento'}
                     </Button>
                   )}
 
@@ -449,9 +466,14 @@ export default function SuportePage() {
                     <Button
                       size="sm"
                       onClick={() => atualizarStatus(chamado.id, 'resolvido')}
+                      disabled={isUpdating}
                     >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Marcar como Resolvido
+                      {isUpdating ? (
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                      )}
+                      {isUpdating ? 'Resolvendo...' : 'Marcar como Resolvido'}
                     </Button>
                   )}
 
