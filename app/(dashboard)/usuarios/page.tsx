@@ -81,8 +81,10 @@ export default function UsuariosPage() {
 
   const [dialogAberto, setDialogAberto] = useState(false);
   const [dialogDetalhes, setDialogDetalhes] = useState(false);
+  const [dialogResetarSenha, setDialogResetarSenha] = useState(false);
   const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null);
   const [usuarioDetalhes, setUsuarioDetalhes] = useState<Usuario | null>(null);
+  const [usuarioResetandoSenha, setUsuarioResetandoSenha] = useState<Usuario | null>(null);
   const [filtro, setFiltro] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState<string>('todos');
   const [statusFiltro, setStatusFiltro] = useState<string>('todos');
@@ -96,6 +98,9 @@ export default function UsuariosPage() {
     ativo: true,
     departamento: '',
     telefone: '',
+  });
+  
+  const [senhaData, setSenhaData] = useState({
     senha: '',
     confirmarSenha: '',
   });
@@ -112,10 +117,15 @@ export default function UsuariosPage() {
       ativo: true,
       departamento: '',
       telefone: '',
+    });
+    setUsuarioEditando(null);
+  };
+  
+  const resetSenhaForm = () => {
+    setSenhaData({
       senha: '',
       confirmarSenha: '',
     });
-    setUsuarioEditando(null);
     setMostrarSenha(false);
     setMostrarConfirmarSenha(false);
   };
@@ -130,13 +140,18 @@ export default function UsuariosPage() {
         ativo: usuario.ativo,
         departamento: usuario.departamento || '',
         telefone: usuario.telefone || '',
-        senha: '',
-        confirmarSenha: '',
       });
     } else {
       resetForm();
+      resetSenhaForm();
     }
     setDialogAberto(true);
+  };
+  
+  const abrirDialogResetarSenha = (usuario: Usuario) => {
+    setUsuarioResetandoSenha(usuario);
+    resetSenhaForm();
+    setDialogResetarSenha(true);
   };
 
   const abrirDetalhes = (usuario: Usuario) => {
@@ -146,22 +161,9 @@ export default function UsuariosPage() {
 
   const salvarUsuario = async () => {
     try {
-      // Validações
-      if (!usuarioEditando) {
-        // Ao criar novo usuário, senha é obrigatória
-        if (!formData.senha || formData.senha.length < 6) {
-          toast.error('A senha deve ter no mínimo 6 caracteres');
-          return;
-        }
-        if (formData.senha !== formData.confirmarSenha) {
-          toast.error('As senhas não coincidem');
-          return;
-        }
-      }
-
       if (usuarioEditando) {
-        // Editar usuário existente
-        const updateData: any = {
+        // Editar usuário existente (sem alterar senha)
+        await updateUsuario({
           ...usuarioEditando,
           nome: formData.nome,
           email: formData.email,
@@ -169,25 +171,25 @@ export default function UsuariosPage() {
           ativo: formData.ativo,
           departamento: formData.departamento,
           telefone: formData.telefone,
-        };
-        
-        // Se uma nova senha foi fornecida, incluir no update
-        if (formData.senha && formData.senha.length >= 6) {
-          if (formData.senha !== formData.confirmarSenha) {
-            toast.error('As senhas não coincidem');
-            return;
-          }
-          updateData.senha = formData.senha;
-        }
-        
-        await updateUsuario(updateData);
+          senha: '', // String vazia para indicar que não deve alterar a senha
+        });
         toast.success('Usuário atualizado com sucesso!');
       } else {
-        // Criar novo usuário
+        // Validações para novo usuário
+        if (!senhaData.senha || senhaData.senha.length < 6) {
+          toast.error('A senha deve ter no mínimo 6 caracteres');
+          return;
+        }
+        if (senhaData.senha !== senhaData.confirmarSenha) {
+          toast.error('As senhas não coincidem');
+          return;
+        }
+        
+        // Criar novo usuário com senha definida
         const novoUsuario: Omit<Usuario, 'id' | 'created_at'> = {
           nome: formData.nome,
           email: formData.email,
-          senha: formData.senha,
+          senha: senhaData.senha,
           tipo: formData.tipo,
           ativo: formData.ativo,
           departamento: formData.departamento,
@@ -202,6 +204,34 @@ export default function UsuariosPage() {
       resetForm();
     } catch (error: any) {
       toast.error(error.message || 'Erro ao salvar usuário');
+    }
+  };
+  
+  const salvarNovaSenha = async () => {
+    try {
+      // Validações
+      if (!senhaData.senha || senhaData.senha.length < 6) {
+        toast.error('A senha deve ter no mínimo 6 caracteres');
+        return;
+      }
+      if (senhaData.senha !== senhaData.confirmarSenha) {
+        toast.error('As senhas não coincidem');
+        return;
+      }
+      
+      if (!usuarioResetandoSenha?.id) return;
+      
+      await updateUsuario({
+        ...usuarioResetandoSenha,
+        senha: senhaData.senha,
+      });
+      
+      toast.success('Senha atualizada com sucesso!');
+      setDialogResetarSenha(false);
+      resetSenhaForm();
+      setUsuarioResetandoSenha(null);
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao resetar senha');
     }
   };
 
@@ -230,11 +260,8 @@ export default function UsuariosPage() {
     }
   };
 
-  const resetarSenha = (id: string | undefined) => {
-    // Em um sistema real, isso enviaria um email com um link para redefinir a senha
-    alert(
-      `Senha resetada para o usuário ID: ${id}. Em um sistema real, um email seria enviado.`
-    );
+  const resetarSenha = (usuario: Usuario) => {
+    abrirDialogResetarSenha(usuario);
   };
 
   const usuariosFiltrados = usuarios.filter((u) => {
@@ -429,21 +456,18 @@ export default function UsuariosPage() {
                   </div>
                 </div>
                 {!usuarioEditando && (
-                  <div className="grid grid-cols-2 gap-4">
+                  <>
                     <div className="grid gap-2">
-                      <Label htmlFor="senha">
-                        Senha {!usuarioEditando && <span className="text-red-500">*</span>}
-                      </Label>
+                      <Label htmlFor="senha">Senha</Label>
                       <div className="relative">
                         <Input
                           id="senha"
                           type={mostrarSenha ? "text" : "password"}
-                          value={formData.senha}
+                          value={senhaData.senha}
                           onChange={(e) =>
-                            setFormData({ ...formData, senha: e.target.value })
+                            setSenhaData({ ...senhaData, senha: e.target.value })
                           }
                           placeholder="Mínimo 6 caracteres"
-                          required={!usuarioEditando}
                           className="pr-10"
                         />
                         <Button
@@ -462,22 +486,16 @@ export default function UsuariosPage() {
                       </div>
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="confirmarSenha">
-                        Confirmar Senha {!usuarioEditando && <span className="text-red-500">*</span>}
-                      </Label>
+                      <Label htmlFor="confirmarSenha">Confirmar Senha</Label>
                       <div className="relative">
                         <Input
                           id="confirmarSenha"
                           type={mostrarConfirmarSenha ? "text" : "password"}
-                          value={formData.confirmarSenha}
+                          value={senhaData.confirmarSenha}
                           onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              confirmarSenha: e.target.value,
-                            })
+                            setSenhaData({ ...senhaData, confirmarSenha: e.target.value })
                           }
                           placeholder="Repita a senha"
-                          required={!usuarioEditando}
                           className="pr-10"
                         />
                         <Button
@@ -493,74 +511,6 @@ export default function UsuariosPage() {
                             <Eye className="h-4 w-4 text-muted-foreground" />
                           )}
                         </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {usuarioEditando && (
-                  <>
-                    <div className="text-sm text-muted-foreground border-t pt-4">
-                      Alterar senha (opcional)
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="senha">Nova Senha</Label>
-                        <div className="relative">
-                          <Input
-                            id="senha"
-                            type={mostrarSenha ? "text" : "password"}
-                            value={formData.senha}
-                            onChange={(e) =>
-                              setFormData({ ...formData, senha: e.target.value })
-                            }
-                            placeholder="Deixe em branco para manter"
-                            className="pr-10"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                            onClick={() => setMostrarSenha(!mostrarSenha)}
-                          >
-                            {mostrarSenha ? (
-                              <EyeOff className="h-4 w-4 text-muted-foreground" />
-                            ) : (
-                              <Eye className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="confirmarSenha">Confirmar Nova Senha</Label>
-                        <div className="relative">
-                          <Input
-                            id="confirmarSenha"
-                            type={mostrarConfirmarSenha ? "text" : "password"}
-                            value={formData.confirmarSenha}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                confirmarSenha: e.target.value,
-                              })
-                            }
-                            placeholder="Repita a nova senha"
-                            className="pr-10"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                            onClick={() => setMostrarConfirmarSenha(!mostrarConfirmarSenha)}
-                          >
-                            {mostrarConfirmarSenha ? (
-                              <EyeOff className="h-4 w-4 text-muted-foreground" />
-                            ) : (
-                              <Eye className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </Button>
-                        </div>
                       </div>
                     </div>
                   </>
@@ -746,7 +696,7 @@ export default function UsuariosPage() {
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
-                            onClick={() => resetarSenha(usuario.id)}
+                            onClick={() => resetarSenha(usuario as Usuario)}
                           >
                             <RefreshCw className="h-4 w-4 mr-2" />
                             Resetar Senha
@@ -924,6 +874,100 @@ export default function UsuariosPage() {
                 </div>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de Resetar Senha */}
+        <Dialog open={dialogResetarSenha} onOpenChange={setDialogResetarSenha}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Resetar Senha</DialogTitle>
+              <DialogDescription>
+                Defina uma nova senha para {usuarioResetandoSenha?.nome}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="novaSenha">Nova Senha</Label>
+                <div className="relative">
+                  <Input
+                    id="novaSenha"
+                    type={mostrarSenha ? "text" : "password"}
+                    value={senhaData.senha}
+                    onChange={(e) =>
+                      setSenhaData({ ...senhaData, senha: e.target.value })
+                    }
+                    placeholder="Mínimo 6 caracteres"
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setMostrarSenha(!mostrarSenha)}
+                  >
+                    {mostrarSenha ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="confirmarNovaSenha">Confirmar Nova Senha</Label>
+                <div className="relative">
+                  <Input
+                    id="confirmarNovaSenha"
+                    type={mostrarConfirmarSenha ? "text" : "password"}
+                    value={senhaData.confirmarSenha}
+                    onChange={(e) =>
+                      setSenhaData({ ...senhaData, confirmarSenha: e.target.value })
+                    }
+                    placeholder="Repita a senha"
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setMostrarConfirmarSenha(!mostrarConfirmarSenha)}
+                  >
+                    {mostrarConfirmarSenha ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDialogResetarSenha(false);
+                  resetSenhaForm();
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={salvarNovaSenha}
+                disabled={isUpdating}
+              >
+                {isUpdating ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  'Resetar Senha'
+                )}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

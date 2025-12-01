@@ -138,9 +138,12 @@ export const usuarioService = {
     try {
       const updateData: any = { ...userData, updated_at: Timestamp.now() };
       
-      // Se a senha foi fornecida, criptografar antes de atualizar
-      if (userData.senha) {
+      // Se a senha foi fornecida E não está vazia, criptografar antes de atualizar
+      if (userData.senha && userData.senha.trim().length > 0) {
         updateData.senha = await hashPassword(userData.senha);
+      } else {
+        // Se a senha está vazia ou não foi fornecida, removê-la do update
+        delete updateData.senha;
       }
       
       await updateDoc(docRef, updateData);
