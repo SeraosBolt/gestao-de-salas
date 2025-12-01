@@ -1,4 +1,5 @@
 import type { Usuario } from './types';
+import { comparePassword } from './crypto';
 // Simple token structure for client-side use
 interface SimpleToken {
   userId: string | undefined;
@@ -21,7 +22,6 @@ export async function login(
   try {
     console.log('🔐 Tentando login com email:', email);
     
-    // Simulação de autenticação - em produção usar hash de senha
     const usuario = await usuarioService.getByEmail(email);
     
     if (!usuario) {
@@ -31,7 +31,10 @@ export async function login(
     
     console.log('👤 Usuário encontrado, verificando senha...');
     
-    if (usuario.senha !== senha) {
+    // Verificar senha usando bcrypt
+    const senhaValida = await comparePassword(senha, usuario.senha);
+    
+    if (!senhaValida) {
       console.warn('⚠️ Senha incorreta');
       return null;
     }

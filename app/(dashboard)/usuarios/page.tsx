@@ -56,6 +56,8 @@ import {
   UserPlus,
   BookOpen,
   Headphones,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import type { Usuario } from '@/lib/types';
 import { getCurrentUser } from '@/lib/auth';
@@ -85,6 +87,8 @@ export default function UsuariosPage() {
   const [tipoFiltro, setTipoFiltro] = useState<string>('todos');
   const [statusFiltro, setStatusFiltro] = useState<string>('todos');
   const [usuario, setUsuario] = useState(getCurrentUser());
+  const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [mostrarConfirmarSenha, setMostrarConfirmarSenha] = useState(false);
   const [formData, setFormData] = useState({
     nome: '',
     email: '',
@@ -92,6 +96,8 @@ export default function UsuariosPage() {
     ativo: true,
     departamento: '',
     telefone: '',
+    senha: '',
+    confirmarSenha: '',
   });
 
   useEffect(() => {
@@ -106,8 +112,12 @@ export default function UsuariosPage() {
       ativo: true,
       departamento: '',
       telefone: '',
+      senha: '',
+      confirmarSenha: '',
     });
     setUsuarioEditando(null);
+    setMostrarSenha(false);
+    setMostrarConfirmarSenha(false);
   };
 
   const abrirDialog = (usuario?: Usuario) => {
@@ -120,6 +130,8 @@ export default function UsuariosPage() {
         ativo: usuario.ativo,
         departamento: usuario.departamento || '',
         telefone: usuario.telefone || '',
+        senha: '',
+        confirmarSenha: '',
       });
     } else {
       resetForm();
@@ -134,9 +146,22 @@ export default function UsuariosPage() {
 
   const salvarUsuario = async () => {
     try {
+      // Validações
+      if (!usuarioEditando) {
+        // Ao criar novo usuário, senha é obrigatória
+        if (!formData.senha || formData.senha.length < 6) {
+          toast.error('A senha deve ter no mínimo 6 caracteres');
+          return;
+        }
+        if (formData.senha !== formData.confirmarSenha) {
+          toast.error('As senhas não coincidem');
+          return;
+        }
+      }
+
       if (usuarioEditando) {
         // Editar usuário existente
-        await updateUsuario({
+        const updateData: any = {
           ...usuarioEditando,
           nome: formData.nome,
           email: formData.email,
@@ -144,19 +169,30 @@ export default function UsuariosPage() {
           ativo: formData.ativo,
           departamento: formData.departamento,
           telefone: formData.telefone,
-        });
+        };
+        
+        // Se uma nova senha foi fornecida, incluir no update
+        if (formData.senha && formData.senha.length >= 6) {
+          if (formData.senha !== formData.confirmarSenha) {
+            toast.error('As senhas não coincidem');
+            return;
+          }
+          updateData.senha = formData.senha;
+        }
+        
+        await updateUsuario(updateData);
         toast.success('Usuário atualizado com sucesso!');
       } else {
         // Criar novo usuário
         const novoUsuario: Omit<Usuario, 'id' | 'created_at'> = {
           nome: formData.nome,
           email: formData.email,
-          senha: 'senha123', // Em um sistema real, a senha deve ser gerada e armazenada de forma segura
+          senha: formData.senha,
           tipo: formData.tipo,
           ativo: formData.ativo,
           departamento: formData.departamento,
           telefone: formData.telefone,
-          foto: 'https://www.shutterstock.com/pt/image-photo/selfie-influencer-girl-live-streaming-update-2489152413',
+          foto: '',
         };
         await createUsuario(novoUsuario);
         toast.success('Usuário criado com sucesso!');
@@ -392,6 +428,143 @@ export default function UsuariosPage() {
                     />
                   </div>
                 </div>
+                {!usuarioEditando && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="senha">
+                        Senha {!usuarioEditando && <span className="text-red-500">*</span>}
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="senha"
+                          type={mostrarSenha ? "text" : "password"}
+                          value={formData.senha}
+                          onChange={(e) =>
+                            setFormData({ ...formData, senha: e.target.value })
+                          }
+                          placeholder="Mínimo 6 caracteres"
+                          required={!usuarioEditando}
+                          className="pr-10"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setMostrarSenha(!mostrarSenha)}
+                        >
+                          {mostrarSenha ? (
+                            <EyeOff className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="confirmarSenha">
+                        Confirmar Senha {!usuarioEditando && <span className="text-red-500">*</span>}
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="confirmarSenha"
+                          type={mostrarConfirmarSenha ? "text" : "password"}
+                          value={formData.confirmarSenha}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              confirmarSenha: e.target.value,
+                            })
+                          }
+                          placeholder="Repita a senha"
+                          required={!usuarioEditando}
+                          className="pr-10"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setMostrarConfirmarSenha(!mostrarConfirmarSenha)}
+                        >
+                          {mostrarConfirmarSenha ? (
+                            <EyeOff className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {usuarioEditando && (
+                  <>
+                    <div className="text-sm text-muted-foreground border-t pt-4">
+                      Alterar senha (opcional)
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="senha">Nova Senha</Label>
+                        <div className="relative">
+                          <Input
+                            id="senha"
+                            type={mostrarSenha ? "text" : "password"}
+                            value={formData.senha}
+                            onChange={(e) =>
+                              setFormData({ ...formData, senha: e.target.value })
+                            }
+                            placeholder="Deixe em branco para manter"
+                            className="pr-10"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setMostrarSenha(!mostrarSenha)}
+                          >
+                            {mostrarSenha ? (
+                              <EyeOff className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="confirmarSenha">Confirmar Nova Senha</Label>
+                        <div className="relative">
+                          <Input
+                            id="confirmarSenha"
+                            type={mostrarConfirmarSenha ? "text" : "password"}
+                            value={formData.confirmarSenha}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                confirmarSenha: e.target.value,
+                              })
+                            }
+                            placeholder="Repita a nova senha"
+                            className="pr-10"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setMostrarConfirmarSenha(!mostrarConfirmarSenha)}
+                          >
+                            {mostrarConfirmarSenha ? (
+                              <EyeOff className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
               <DialogFooter>
                 <Button

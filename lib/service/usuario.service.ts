@@ -14,6 +14,7 @@ import {
 import { db } from '../firebase'; // ajuste o caminho
 import { Usuario, ServiceResponse } from '../types'; // ajuste o caminho
 import { fromFirestore } from '../utils/fromFirestore'; // ajuste o caminho
+import { hashPassword } from '../crypto';
 
 const USUARIOS_COLLECTION = 'usuarios';
 
@@ -25,6 +26,9 @@ export const usuarioService = {
     userData: Omit<Usuario, 'id' | 'created_at' | 'updated_at'>
   ): Promise<ServiceResponse & { usuarioId?: string }> => {
     try {
+      // Criptografar a senha antes de salvar
+      const hashedPassword = await hashPassword(userData.senha);
+      
       const newUserId = await runTransaction(db, async (transaction) => {
         const usersCollectionRef = collection(
           db,
@@ -45,6 +49,7 @@ export const usuarioService = {
         const newDocRef = doc(usersCollectionRef);
         const newUserData: Omit<Usuario, 'id'> = {
           ...userData,
+          senha: hashedPassword,
           created_at: Timestamp.now(),
         };
         transaction.set(newDocRef, newUserData);
@@ -131,10 +136,14 @@ export const usuarioService = {
     if (!id) return { codRet: 1, msgRet: 'ID do usuário não fornecido.' };
     const docRef = doc(db, USUARIOS_COLLECTION, id);
     try {
-      await updateDoc(docRef, {
-        ...userData,
-        updated_at: Timestamp.now(),
-      });
+      const updateData: any = { ...userData, updated_at: Timestamp.now() };
+      
+      // Se a senha foi fornecida, criptografar antes de atualizar
+      if (userData.senha) {
+        updateData.senha = await hashPassword(userData.senha);
+      }
+      
+      await updateDoc(docRef, updateData);
       return { codRet: 0, msgRet: 'Usuário atualizado com sucesso.' };
     } catch (error: any) {
       return {

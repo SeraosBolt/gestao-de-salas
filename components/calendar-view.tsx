@@ -186,7 +186,16 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
   } | null>(null)
   const [salaId, setSalaId] = useState<string>(salaFiltro || "todas")
   const [horaAtual, setHoraAtual] = useState(new Date())
+  const [isMobile, setIsMobile] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  // Detectar se é mobile
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 640)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   // Atualizar hora atual a cada minuto
   useEffect(() => {
@@ -204,9 +213,10 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
       const horas = agora.getHours()
       const minutos = agora.getMinutes()
       
-      // Usar 64px para mobile (h-16) - será mais preciso que tentar detectar breakpoint
-      const pixelsPorMinuto = 64 / 60
-      const offsetDoInicioDoDia = (horas - 7) * 64 + minutos * pixelsPorMinuto
+      // Usar altura correta baseado em mobile ou desktop
+      const alturaPorHora = isMobile ? 64 : 80
+      const pixelsPorMinuto = alturaPorHora / 60
+      const offsetDoInicioDoDia = (horas - 7) * alturaPorHora + minutos * pixelsPorMinuto
       
       // Centralizar a hora atual na viewport
       const viewportHeight = scrollContainerRef.current.clientHeight
@@ -214,7 +224,7 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
       
       scrollContainerRef.current.scrollTop = scrollPosition
     }
-  }, [])
+  }, [isMobile])
 
   const diasSemana = useMemo(() => {
     const dias = []
@@ -279,12 +289,8 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
     const fimMinutos = timeToMinutes(horario.horaFim)
     const duracao = fimMinutos - inicioMinutos
 
-    // Usar 64px para mobile (h-16) e 80px para desktop (sm:h-20)
-    // Como não podemos detectar a largura da tela aqui, usamos CSS calc() com variáveis CSS
-    // Vamos calcular baseado em 64px (mobile) e ajustar via CSS
-    const pixelsPorHoraMobile = 64
-    const topOffset = (inicioMinutos - 7 * 60) * (pixelsPorHoraMobile / 60)
-    const height = duracao * (pixelsPorHoraMobile / 60)
+    // Calcular offset em minutos a partir das 7h
+    const minutosDesde7h = inicioMinutos - 7 * 60
 
     // Calcular largura e posição horizontal
     const larguraPorcentagem = 100 / totalColunas
@@ -292,8 +298,8 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
     const gap = 2 // Gap em pixels entre as aulas
 
     return {
-      top: `${topOffset}px`,
-      height: `${Math.max(height, 40)}px`,
+      minutosDesde7h,
+      duracao,
       left: `calc(${leftPorcentagem}% + ${gap}px)`,
       width: `calc(${larguraPorcentagem}% - ${gap * 2}px)`,
     }
@@ -341,8 +347,8 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
     const totalMinutos = horas * 60 + minutos
     const minutosDesde7AM = totalMinutos - 7 * 60
     
-    // Usar 64px para mobile (h-16)
-    const pixelsPorMinuto = 64 / 60
+    // Usar altura correta baseado em mobile ou desktop
+    const pixelsPorMinuto = isMobile ? (64 / 60) : (80 / 60)
     return minutosDesde7AM * pixelsPorMinuto
   }
 
@@ -403,7 +409,7 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
         <div className="min-w-full">
           {/* Cabeçalho dos dias */}
           <div
-            className="grid border-b sticky top-0 w-max bg-background z-10"
+            className="grid border-b sticky top-0  bg-background z-10"
             style={{ gridTemplateColumns: "50px repeat(7, minmax(80px, 1fr))" }}
           >
             <div className="p-1 sm:p-2 text-center text-[10px] sm:text-xs font-medium text-muted-foreground border-r bg-muted/30">
@@ -476,16 +482,24 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
                     ))}
 
                     {aulasNoDia.map(({ aula, horario, coluna, totalColunas }, idx) => {
-                      const style = getAulaStyle(horario, coluna, totalColunas)
+                      const styleData = getAulaStyle(horario, coluna, totalColunas)
                       const duracao = calcularDuracao(horario.horaInicio, horario.horaFim)
                       const displayInfo = getAulaDisplayInfo(aula)
+
+                      // Calcular top e height baseado em mobile ou desktop
+                      const pixelsPorMinuto = isMobile ? (64 / 60) : (80 / 60)
+                      const top = styleData.minutosDesde7h * pixelsPorMinuto
+                      const height = Math.max(styleData.duracao * pixelsPorMinuto, 40)
 
                       return (
                         <div
                           key={`${aula.id}-${horario.diaSemana}-${horario.horaInicio}-${idx}`}
                           className="absolute rounded-lg px-1 sm:px-2 py-1 sm:py-1.5 cursor-pointer overflow-hidden shadow-md hover:shadow-lg transition-all hover:z-10 border border-white/20"
                           style={{
-                            ...style,
+                            top: `${top}px`,
+                            height: `${height}px`,
+                            left: styleData.left,
+                            width: styleData.width,
                             backgroundColor: aula.cor || CORES_AULAS[Number.parseInt(aula.id) % CORES_AULAS.length],
                           }}
                           onClick={(e) => {
@@ -526,11 +540,11 @@ export function CalendarView({ aulas, salas, onSelectSlot, salaFiltro, showAllRo
             {/* Linha da hora atual */}
             {mostrarLinhaHoraAtual() && (
               <div
-                className="absolute left-0 right-0 z-20 pointer-events-none"
+                className="absolute left-0 right-0 z-9 pointer-events-none"
                 style={{ top: `${getPosicaoHoraAtual()}px` }}
               >
                 <div className="flex items-center">
-                  <div className="flex-shrink-0 w-[70px] flex justify-end pr-2">
+                  <div className="flex-shrink-0 flex justify-end pr-2">
                     <div className="bg-red-500 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded">
                       {horaAtual.getHours().toString().padStart(2, "0")}:
                       {horaAtual.getMinutes().toString().padStart(2, "0")}
